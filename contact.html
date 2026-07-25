@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contact — Food Industry Fabrication Ltd.</title>
+  <meta name="description" content="Contact Food Industry Fabrication Ltd. — phone, email, location, and enquiry form.">
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <!-- ===== HEADER (identical on every page — keep in sync) ================= -->
+  <header class="site-header">
+    <div class="container site-header__inner">
+      <a class="brand" href="index.html" aria-label="Food Industry Fabrication Ltd. — Home">
+        <img class="brand__logo" src="assets/logo.svg" alt="" width="40" height="40">
+        <span class="brand__name">Food Industry<br><span>Fabrication</span> Ltd.</span>
+      </a>
+      <nav class="main-nav" aria-label="Primary">
+        <ul>
+          <li><a href="index.html">Home</a></li>
+          <li><a href="about.html">About Us</a></li>
+          <li><a href="gallery.html">Gallery</a></li>
+          <li><a href="services.html">Services</a></li>
+          <li><a href="contact.html" aria-current="page">Contact</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+  <!-- ===== /HEADER ========================================================= -->
+
+  <main id="main">
+    <section class="section">
+      <div class="container">
+        <h1 class="section__title">Contact</h1>
+
+        <div class="contact-grid">
+
+          <!-- Enquiry form.
+               NOTE: placeholder only — this form does not submit anywhere yet.
+               Wire up an "action" to a form handler (Netlify Forms, Formspree, etc.)
+               or a serverless endpoint. See SITE-SPEC.md section 6. -->
+          <form class="contact-form" aria-label="Contact enquiry form">
+            <div class="form-field">
+              <label for="name">Name</label>
+              <input type="text" id="name" name="name" autocomplete="name" required>
+            </div>
+            <div class="form-field">
+              <label for="email">Email</label>
+              <input type="email" id="email" name="email" autocomplete="email" required>
+            </div>
+            <div class="form-field">
+              <label for="phone">Phone</label>
+              <input type="tel" id="phone" name="phone" autocomplete="tel">
+            </div>
+            <div class="form-field">
+              <label for="message">Message</label>
+              <textarea id="message" name="message" required></textarea>
+            </div>
+            <button type="submit" class="btn">Send enquiry</button>
+          </form>
+
+          <!-- Contact details + map -->
+          <div>
+            <ul class="contact-details">
+              <li><strong>Email</strong> info@example.com <!-- placeholder --></li>
+              <li><strong>Phone</strong> +44 (0)000 000 0000 <!-- placeholder --></li>
+              <li><strong>Address</strong> 123 Placeholder Way, Industrial Estate, City, Postcode</li>
+            </ul>
+
+            <!-- Google Maps embed placeholder.
+                 Replace this whole .map-embed block's contents with the client's
+                 real embed iframe from Google Maps > Share > Embed a map, e.g.:
+                 <iframe src="https://www.google.com/maps/embed?pb=..."
+                         loading="lazy" referrerpolicy="no-referrer-when-downgrade"
+                         title="Our location"></iframe>
+                 Using loading="lazy" keeps the page fast. -->
+            <div class="map-embed">
+              <div class="placeholder placeholder--wide">Google Maps embed placeholder</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===== FOOTER (identical on every page — keep in sync) ================= -->
+  <footer class="site-footer">
+    <div class="container site-footer__inner">
+      <p>&copy; 2026 Food Industry Fabrication Ltd. All rights reserved.</p>
+      <p><a href="contact.html">Contact us</a></p>
+    </div>
+  </footer>
+  <!-- ===== /FOOTER ========================================================= -->
+
+  <script src="js/prefetch.js" defer></script>
+</body>
+</html>

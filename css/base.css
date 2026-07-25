@@ -1,0 +1,161 @@
+/* ============================================================================
+   base.css — RESET, TYPOGRAPHY, LAYOUT, HEADER / NAV / FOOTER
+   ----------------------------------------------------------------------------
+   Depends on variables from theme.css (load theme.css first).
+   ========================================================================== */
+
+/* ---- Minimal reset ------------------------------------------------------- */
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  line-height: var(--line-height);
+}
+
+img,
+svg { max-width: 100%; display: block; }
+
+a { color: var(--color-primary); }
+a:hover { color: var(--color-primary-dark); }
+
+h1, h2, h3, p, ul { margin: 0 0 var(--space-md) 0; }
+
+h1 { font-size: var(--fs-h1); line-height: 1.1; font-weight: 700; }
+h2 { font-size: var(--fs-h2); line-height: 1.2; font-weight: 700; }
+h3 { font-size: var(--fs-h3); line-height: 1.25; font-weight: 700; }
+
+/* Visible keyboard focus everywhere (accessibility) */
+:focus-visible {
+  outline: var(--border-width-accent) solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* ---- Layout primitives --------------------------------------------------- */
+.container {
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 0 var(--space-md);
+}
+
+/* A standard vertical-rhythm section */
+.section { padding: var(--space-xl) 0; }
+.section--tint { background: var(--color-surface); }
+.section__title {
+  border-left: var(--border-width-accent) solid var(--color-primary);
+  padding-left: var(--space-sm);
+}
+
+/* Skip link for keyboard users */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--color-primary);
+  color: var(--color-text-invert);
+  padding: var(--space-sm) var(--space-md);
+  z-index: 100;
+}
+.skip-link:focus { left: 0; }
+
+/* ============================================================================
+   HEADER  (sticky, always visible)
+   ========================================================================== */
+.site-header {
+  position: sticky;               /* stays visible; degrades to static on old browsers */
+  top: 0;
+  z-index: 50;
+  background: var(--color-header-bg);
+  border-bottom: var(--border-width-accent) solid var(--color-primary);
+}
+
+.site-header__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  min-height: var(--header-height);
+  flex-wrap: wrap;
+}
+
+/* Brand: logo + company name, links to Home */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  text-decoration: none;
+  color: var(--color-text);
+}
+.brand__logo {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+}
+.brand__name {
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1.15;
+  letter-spacing: 0.2px;
+}
+.brand__name span { color: var(--color-primary); }
+
+/* Primary navigation tabs */
+.main-nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.main-nav a {
+  display: block;
+  padding: var(--space-sm) var(--space-md);
+  text-decoration: none;
+  color: var(--color-text);
+  font-weight: 600;
+  border-bottom: var(--border-width-accent) solid transparent; /* reserve space; no shift */
+}
+.main-nav a:hover {
+  color: var(--color-primary-dark);
+  background: var(--color-primary-light);
+}
+/* Active tab (marked with aria-current="page" in the HTML) */
+.main-nav a[aria-current="page"] {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+/* ============================================================================
+   FOOTER  (minimal)
+   ========================================================================== */
+.site-footer {
+  background: var(--color-footer-bg);
+  color: var(--color-text-invert);
+  padding: var(--space-lg) 0;
+  margin-top: var(--space-xl);
+}
+.site-footer a { color: #cfe8d6; }
+.site-footer__inner {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-md);
+  font-size: var(--fs-small);
+}
+.site-footer p { margin: 0; }
+
+/* ---- Small screens ------------------------------------------------------- */
+@media (max-width: 640px) {
+  :root { --fs-h1: 2rem; }
+  .site-header__inner { justify-content: center; text-align: center; }
+  .main-nav a { padding: var(--space-xs) var(--space-sm); }
+}
