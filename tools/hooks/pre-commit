@@ -1,0 +1,28 @@
+#!/bin/sh
+# ---------------------------------------------------------------------------
+# Blocks a commit if:
+#   - any page's header/footer has drifted from partials/, or
+#   - a colour is hard-coded outside css/theme.css.
+#
+# Installed with:  git config core.hooksPath tools/hooks
+# Bypass once:     git commit --no-verify
+# ---------------------------------------------------------------------------
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "pre-commit: node not found — skipping project checks." >&2
+  exit 0
+fi
+
+if ! node tools/sync-partials.js --check; then
+  echo ""
+  echo "pre-commit: blocked — the header/footer in one or more pages does not"
+  echo "match partials/. Run 'npm run sync', stage the changed pages, then commit."
+  exit 1
+fi
+
+if ! node tools/check-colours.js; then
+  echo ""
+  echo "pre-commit: blocked — colours must live in css/theme.css so the site can"
+  echo "be re-themed from one file. Add a token there and use var(--color-…)."
+  exit 1
+fi

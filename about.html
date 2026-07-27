@@ -12,14 +12,43 @@
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
 
-  <!-- ===== HEADER (identical on every page — keep in sync) ================= -->
+  <!-- ===== HEADER — generated from partials/header.html · DO NOT EDIT ===== -->
   <header class="site-header">
     <div class="container site-header__inner">
       <a class="brand" href="index.html" aria-label="Food Industry Fabrication Ltd. — Home">
-        <img class="brand__logo" src="assets/logo.svg" alt="" width="40" height="40">
+        <!-- Placeholder logo mark, inlined so it inherits the theme.css colours.
+             An <img src="*.svg"> renders in its own document and cannot see them. -->
+        <svg class="brand__logo" viewBox="0 0 64 64" width="40" height="40"
+             aria-hidden="true" focusable="false">
+          <rect width="64" height="64" fill="var(--color-primary)"/>
+          <rect x="6" y="6" width="52" height="52" fill="none"
+                stroke="var(--color-text-invert)" stroke-width="3"/>
+          <g fill="var(--color-text-invert)">
+            <path d="M32 16l3 4 5-1 1 5 4 3-3 4 3 4-4 3-1 5-5-1-3 4-3-4-5 1-1-5-4-3 3-4-3-4 4-3 1-5 5 1z"/>
+            <circle cx="32" cy="32" r="7" fill="var(--color-primary)"/>
+          </g>
+          <text x="32" y="37" font-family="Arial, sans-serif" font-size="11" font-weight="700"
+                text-anchor="middle" fill="var(--color-text-invert)">FIFL</text>
+        </svg>
         <span class="brand__name">Food Industry<br><span>Fabrication</span> Ltd.</span>
       </a>
-      <nav class="main-nav" aria-label="Primary">
+
+      <!-- Three-bar menu button. Shown only below 820px, where the brand and the
+           five tabs no longer fit one row (see css/base.css § MOBILE MENU).
+
+           It ships with `hidden` and is revealed by js/nav.js. That way a browser
+           with JavaScript disabled never sees a button that cannot do anything —
+           it falls back to the plain, always-visible nav below. -->
+      <button class="nav-toggle" type="button" hidden
+              aria-label="Menu" aria-expanded="false" aria-controls="primary-nav">
+        <svg class="nav-toggle__icon" viewBox="0 0 24 24" width="24" height="24"
+             aria-hidden="true" focusable="false">
+          <path d="M3 6h18M3 12h18M3 18h18" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+
+      <nav class="main-nav" id="primary-nav" aria-label="Primary">
         <ul>
           <li><a href="index.html">Home</a></li>
           <li><a href="about.html" aria-current="page">About Us</a></li>
@@ -30,7 +59,7 @@
       </nav>
     </div>
   </header>
-  <!-- ===== /HEADER ========================================================= -->
+  <!-- ===== /HEADER ===== -->
 
   <main id="main">
     <section class="section">
@@ -76,15 +105,16 @@
     </section>
   </main>
 
-  <!-- ===== FOOTER (identical on every page — keep in sync) ================= -->
+  <!-- ===== FOOTER — generated from partials/footer.html · DO NOT EDIT ===== -->
   <footer class="site-footer">
     <div class="container site-footer__inner">
       <p>&copy; 2026 Food Industry Fabrication Ltd. All rights reserved.</p>
       <p><a href="contact.html">Contact us</a></p>
     </div>
   </footer>
-  <!-- ===== /FOOTER ========================================================= -->
+  <!-- ===== /FOOTER ===== -->
 
   <script src="js/prefetch.js" defer></script>
+  <script src="js/nav.js" defer></script>
 </body>
 </html>

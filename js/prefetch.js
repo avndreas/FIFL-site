@@ -64,7 +64,9 @@
     if (a.hasAttribute("download")) return;  // not file downloads
     if (url.pathname === location.pathname) return; // not the current page
 
-    prefetch(url.href);
+    // Drop the #fragment: it never reaches the server, so all four home cards
+    // pointing into services.html are one prefetch, not four identical ones.
+    prefetch(url.origin + url.pathname + url.search);
   }
 
   // Hover (desktop), touch (mobile), and keyboard focus (accessibility).

@@ -85,6 +85,10 @@
 
 @media (max-width: 780px) {
   .hero__grid { grid-template-columns: 1fr; }
+  /* Once stacked, the square goes full-bleed — ~320px tall on a phone — and
+     pushes everything below it that far down. A landscape crop is the better
+     mobile hero shape anyway. Keep real photography to this ratio here. */
+  .hero__image { aspect-ratio: 16 / 9; }
 }
 
 /* ============================================================================
@@ -112,9 +116,9 @@
   background-color: var(--color-primary-dark);
   background-image: linear-gradient(
     to top,
-    rgba(0, 0, 0, 0.78) 0%,
-    rgba(0, 0, 0, 0.30) 55%,
-    rgba(0, 0, 0, 0.15) 100%
+    var(--color-scrim-strong) 0%,
+    var(--color-scrim-mid) 55%,
+    var(--color-scrim-soft) 100%
   );
   background-size: cover;
   background-position: center;
@@ -128,21 +132,43 @@
 .card__text {
   margin: 0;
   font-size: var(--fs-small);
-  color: #eef3ef;
+  color: var(--color-text-invert-muted);
 }
 
 /* Distinct placeholder tints per card so the four read as different "images".
    Delete these overrides once real background images are set. */
-.card--1 { background-color: #1f7a3d; }
-.card--2 { background-color: #2b6b46; }
-.card--3 { background-color: #145c2c; }
-.card--4 { background-color: #35814f; }
+.card--1 { background-color: var(--color-card-1); }
+.card--2 { background-color: var(--color-card-2); }
+.card--3 { background-color: var(--color-card-3); }
+.card--4 { background-color: var(--color-card-4); }
 
 @media (max-width: 900px) {
   .expertise-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 520px) {
   .expertise-grid { grid-template-columns: 1fr; }
+}
+
+/* ============================================================================
+   SERVICE ROWS  (Services) — text left, image right, one full-width band each
+   ----------------------------------------------------------------------------
+   Each service is its own <section>, so the alternating .section--tint gives
+   every one a distinct horizontal band across the page. The grid lives on the
+   same element as .container (same trick as .hero__grid).
+   ========================================================================== */
+.service {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-lg);
+  align-items: center;
+}
+.service__body { max-width: 60ch; }
+.service__body > :last-child { margin-bottom: 0; }
+.service__image { width: 100%; }
+
+@media (max-width: 780px) {
+  /* Stacked: text first, then the image — matches source order. */
+  .service { grid-template-columns: 1fr; }
 }
 
 /* ============================================================================

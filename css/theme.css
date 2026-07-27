@@ -10,7 +10,7 @@
   /* ---- Brand colours: white + green -------------------------------------- */
   --color-bg:            #ffffff;   /* page background                       */
   --color-surface:       #f3f6f3;   /* cards, alternating sections           */
-  --color-primary:       #1f7a3d;   /* brand green: accents, buttons, active */
+  --color-primary:       #123524;   /* brand green: accents, buttons, active */
   --color-primary-dark:  #145c2c;   /* hover / pressed green                 */
   --color-primary-light: #e7f1ea;   /* tinted backgrounds                    */
   --color-accent:        #3a9d5d;   /* secondary green                       */
@@ -19,14 +19,32 @@
   --color-text:          #1a1a1a;   /* body text                             */
   --color-text-muted:    #555b55;   /* secondary text                        */
   --color-text-invert:   #ffffff;   /* text on dark/green backgrounds        */
+  --color-text-invert-muted: #eef3ef; /* secondary text on dark backgrounds  */
 
   /* ---- Lines & chrome ---------------------------------------------------- */
   --color-border:        #cbd4cb;   /* borders, dividers                     */
   --color-header-bg:     #ffffff;   /* header background                     */
-  --color-footer-bg:     #12331f;   /* footer background (dark green)        */
+  --color-footer-bg:     #123524;   /* footer background (dark green)        */
+  --color-footer-link:   #cfe8d6;   /* links on the dark footer              */
 
   /* ---- Focus ring (accessibility) ---------------------------------------- */
   --color-focus:         #1f7a3d;
+
+  /* ---- Overlay scrim ------------------------------------------------------
+     Darkening wash laid over card backgrounds so light text stays readable
+     over whatever image ends up behind it.                                   */
+  --color-scrim-strong:  rgba(0, 0, 0, 0.78);
+  --color-scrim-mid:     rgba(0, 0, 0, 0.30);
+  --color-scrim-soft:    rgba(0, 0, 0, 0.15);
+
+  /* ---- Placeholder card tints ---------------------------------------------
+     Stand-ins that make the four expertise cards read as four different
+     "images". Delete these (and the .card--N rules in components.css) once
+     real background images are set.                                          */
+  --color-card-1:        #1f7a3d;
+  --color-card-2:        #2b6b46;
+  --color-card-3:        #145c2c;
+  --color-card-4:        #35814f;
 
   /* ---- Spacing scale ----------------------------------------------------- */
   --space-xs:  0.375rem;

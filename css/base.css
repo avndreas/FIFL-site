@@ -38,6 +38,10 @@ h3 { font-size: var(--fs-h3); line-height: 1.25; font-weight: 700; }
   outline-offset: 2px;
 }
 
+/* The header is sticky, so anything jumped to by an #anchor — the skip link's
+   #main above all — would otherwise land underneath it. Reserve that space. */
+[id] { scroll-margin-top: calc(var(--header-height) + var(--space-sm)); }
+
 /* ---- Layout primitives --------------------------------------------------- */
 .container {
   width: 100%;
@@ -134,6 +138,27 @@ h3 { font-size: var(--fs-h3); line-height: 1.25; font-weight: 700; }
   border-bottom-color: var(--color-primary);
 }
 
+/* ---- Three-bar menu button (only ever visible below 640px) --------------- */
+.nav-toggle {
+  display: none;                 /* the media query below turns it on */
+  align-items: center;
+  justify-content: center;
+  width: 48px;                   /* 48px square = comfortable touch target */
+  height: 48px;
+  padding: 0;
+  background: none;
+  color: var(--color-text);      /* the icon strokes with currentColor */
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.nav-toggle:hover {
+  color: var(--color-primary-dark);
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+}
+.nav-toggle__icon { width: 24px; height: 24px; }
+
 /* ============================================================================
    FOOTER  (minimal)
    ========================================================================== */
@@ -143,7 +168,7 @@ h3 { font-size: var(--fs-h3); line-height: 1.25; font-weight: 700; }
   padding: var(--space-lg) 0;
   margin-top: var(--space-xl);
 }
-.site-footer a { color: #cfe8d6; }
+.site-footer a { color: var(--color-footer-link); }
 .site-footer__inner {
   display: flex;
   flex-wrap: wrap;
@@ -153,9 +178,96 @@ h3 { font-size: var(--fs-h3); line-height: 1.25; font-weight: 700; }
 }
 .site-footer p { margin: 0; }
 
-/* ---- Small screens ------------------------------------------------------- */
+/* ---- Small screens: typography ------------------------------------------- */
 @media (max-width: 640px) {
   :root { --fs-h1: 2rem; }
-  .site-header__inner { justify-content: center; text-align: center; }
-  .main-nav a { padding: var(--space-xs) var(--space-sm); }
+}
+
+/* ============================================================================
+   MOBILE MENU  (below 820px)
+   ----------------------------------------------------------------------------
+   The brand plus five tabs need a MEASURED 755px to sit on one row. Below that
+   they wrap to a second row under the brand (and to a third on a phone), and
+   because the header is sticky that cost is paid for the whole scroll. So below
+   820px the tabs collapse behind the three-bar button instead: brand + button
+   on one row, the menu opening as a full-width column underneath.
+
+   Why 820 and not 755: 755 is what THIS text measures in the system font stack
+   on Windows. The stack resolves to a different face on macOS, iOS and Android,
+   and the brand name may yet change, so the breakpoint carries ~65px of slack.
+   820 is also already a breakpoint in components.css (.contact-grid).
+
+   If you re-measure after a copy change, the number that matters is the width
+   at which .site-header stops being ~71px tall and becomes ~116px.
+
+   Note what is deliberately NOT here: a smaller tap target. An earlier version
+   shrank the nav padding at this breakpoint, which took each link to ~41px tall
+   — under both Apple's 44px and Google's 48px minimum, and backwards, since
+   touch is the input that needs the *larger* target. The links keep their
+   full-size padding; stacking is what buys back the room.
+
+   ---- RULE: THE STICKY HEADER MUST NEVER CHANGE HEIGHT --------------------
+   The menu is an OVERLAY (absolutely positioned under the header), not a second
+   flow row inside it. That distinction is the whole reason the page no longer
+   jumps when the menu opens.
+
+   The first version put the open menu in normal flow, so the header grew from
+   71px to 324px. A sticky element pinned at the top of the document growing by
+   253px means every following box moves down 253px, and the browser's scroll
+   anchoring then compensates by jumping the scroll position by the same 253px
+   (measured, both directions). The header stayed pinned, but the whole page
+   lurched under it, and mid-reflow the header itself could ride up past the top.
+
+   Out of flow, the header is 71px whether the menu is open or shut. Nothing
+   below it moves, so there is nothing for scroll anchoring to correct.
+
+   Anything else that ever appears in this header — a search field, a phone
+   number, a language picker, an announcement bar — follows the same rule:
+   overlay it, or give it space the header always reserves. Never let the header
+   resize. `--header-height` in theme.css is depended on by the [id]
+   scroll-margin rule above, and that promise only holds if this one does.
+   ========================================================================== */
+@media (max-width: 820px) {
+  /* :not([hidden]) so the attribute always wins — with JS off the button that
+     js/nav.js never revealed stays gone, and the plain nav shows instead. */
+  .nav-toggle:not([hidden]) { display: inline-flex; }
+
+  /* Row 1 is brand + button, and stays the only row. The menu hangs off the
+     bottom edge, over the page, taking no space in the header's own layout.
+     It resolves against .site-header, which is `position: sticky` and therefore
+     already a containing block — no extra positioning context needed. */
+  .main-nav {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--color-header-bg);
+    border-bottom: var(--border-width-accent) solid var(--color-primary);
+  }
+  .site-header[data-nav="closed"] .main-nav { display: none; }
+
+  /* An overlay must not run off the bottom of a short screen (a landscape
+     phone), so the list scrolls internally rather than the page growing. */
+  .main-nav ul {
+    flex-direction: column;
+    gap: 0;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+
+  /* Stacked, a bottom border reads as a divider, so the active marker moves to
+     the leading edge. Both borders are always present, only recoloured, so
+     opening the menu never shifts the rows. */
+  .main-nav a {
+    border-bottom: var(--border-width) solid var(--color-border);
+    border-left: var(--border-width-accent) solid transparent;
+  }
+  .main-nav a[aria-current="page"] {
+    border-bottom-color: var(--color-border);
+    border-left-color: var(--color-primary);
+    background: var(--color-primary-light);
+  }
+  /* The overlay's own green border closes the list; a divider here would double
+     it. Kept transparent rather than removed so the row height never changes. */
+  .main-nav li:last-child a { border-bottom-color: transparent; }
 }
