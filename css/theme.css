@@ -7,28 +7,39 @@
    ========================================================================== */
 
 :root {
-  /* ---- Brand colours: white + green -------------------------------------- */
+  /* ---- Brand colours: white + navy + red ---------------------------------
+     Navy is the structural colour — links, chrome, borders, the footer.
+     Red is the highlight, used sparingly on the things meant to be noticed:
+     the call-to-action buttons, the active tab, and the title accents.       */
   --color-bg:            #ffffff;   /* page background                       */
-  --color-surface:       #f3f6f3;   /* cards, alternating sections           */
-  --color-primary:       #123524;   /* brand green: accents, buttons, active */
-  --color-primary-dark:  #145c2c;   /* hover / pressed green                 */
-  --color-primary-light: #e7f1ea;   /* tinted backgrounds                    */
-  --color-accent:        #3a9d5d;   /* secondary green                       */
+  --color-surface:       #f1f7ff;   /* cards, alternating sections           */
+  --color-primary:       #0f2747;   /* brand navy: links, chrome, borders    */
+  --color-primary-dark:  #1c4272;   /* hover / pressed navy                  */
+  --color-primary-light: #e4ebf5;   /* tinted backgrounds                    */
+
+  /* ---- Accent: brand red --------------------------------------------------
+     Buttons, active tab, heading bars, logo mark.                           */
+  --color-accent:        #b3121f;   /* brand red                             */
+  --color-accent-dark:   #8c0d18;   /* hover / pressed red                   */
+  --color-accent-light:  #fbe9eb;   /* tinted red backgrounds                */
 
   /* ---- Text -------------------------------------------------------------- */
-  --color-text:          #1a1a1a;   /* body text                             */
-  --color-text-muted:    #555b55;   /* secondary text                        */
-  --color-text-invert:   #ffffff;   /* text on dark/green backgrounds        */
-  --color-text-invert-muted: #eef3ef; /* secondary text on dark backgrounds  */
+  --color-text:          #16191f;   /* body text                             */
+  --color-text-muted:    #555f6d;   /* secondary text                        */
+  --color-text-invert:   #ffffff;   /* text on dark/navy/red backgrounds     */
+  --color-text-invert-muted: #e8edf5; /* secondary text on dark backgrounds  */
 
   /* ---- Lines & chrome ---------------------------------------------------- */
-  --color-border:        #cbd4cb;   /* borders, dividers                     */
+  --color-border:        #c9d2de;   /* borders, dividers                     */
   --color-header-bg:     #ffffff;   /* header background                     */
-  --color-footer-bg:     #123524;   /* footer background (dark green)        */
-  --color-footer-link:   #cfe8d6;   /* links on the dark footer              */
+  --color-footer-bg:     #b3121f;   /* brand red                             */
+  --color-footer-link:   #cddcf0;   /* links on the navy footer              */
 
-  /* ---- Focus ring (accessibility) ---------------------------------------- */
-  --color-focus:         #1f7a3d;
+  /* ---- Focus ring (accessibility) -----------------------------------------
+     A brighter blue than either brand colour on purpose: it has to clear 3:1
+     against the white page AND the navy footer, which neither navy nor red
+     manages on both.                                                        */
+  --color-focus:         #2f6fd0;
 
   /* ---- Overlay scrim ------------------------------------------------------
      Darkening wash laid over card backgrounds so light text stays readable
@@ -39,12 +50,13 @@
 
   /* ---- Placeholder card tints ---------------------------------------------
      Stand-ins that make the four expertise cards read as four different
-     "images". Delete these (and the .card--N rules in components.css) once
-     real background images are set.                                          */
-  --color-card-1:        #1f7a3d;
-  --color-card-2:        #2b6b46;
-  --color-card-3:        #145c2c;
-  --color-card-4:        #35814f;
+     "images". They alternate navy/red so the 2x2 grid reads as a deliberate
+     checkerboard. Delete these (and the .card--N rules in components.css)
+     once real background images are set.                                     */
+  --color-card-1:        #12325c;
+  --color-card-2:        #8c1420;
+  --color-card-3:        #1c4272;
+  --color-card-4:        #6d1018;
 
   /* ---- Spacing scale ----------------------------------------------------- */
   --space-xs:  0.375rem;
@@ -60,10 +72,53 @@
   --border-width-accent: 3px; /* the chunky brand borders (sharp look)       */
   --radius: 0;               /* 0 = sharp edges. Bump slightly to soften.    */
 
-  /* ---- Typography (system stack: no downloads) --------------------------- */
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
-               Ubuntu, Cantarell, "Helvetica Neue", Arial, sans-serif;
+  /* ---- Typography ---------------------------------------------------------
+     THE SWITCH is at the bottom of this section: one line, one value.
+
+     Every option below ends in --font-system, so the original system stack is
+     always the last resort. If a webfont is slow, blocked, or unsupported, the
+     page still renders in the font it uses today — never in Times New Roman.
+
+     The @font-face rules live in css/fonts.css. A font file is downloaded only
+     when the active stack actually names it, so the options you are not using
+     cost nothing. See fonts.css for how to delete a candidate for good.        */
+
+  /* The current font: whatever the OS provides. Zero downloads.               */
+  --font-system: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+                 Ubuntu, Cantarell, "Helvetica Neue", Arial, sans-serif;
+
+  /* ---- Candidates ---------------------------------------------------------
+     Self-hosted (assets/fonts/, one variable WOFF2 each):                     */
+  --font-inter:       "Inter", var(--font-system);        /* 47 KB */
+  --font-public-sans: "Public Sans", var(--font-system);  /* 26 KB */
+  --font-archivo:     "Archivo", var(--font-system);      /* 34 KB */
+
+  /* Local-only — see the Bell MT note at the foot of css/fonts.css. Renders
+     for you if Office is installed; falls back to Georgia for most visitors,
+     because a serif that goes missing should land on another serif.           */
+  --font-bell-mt:     "Bell MT", Georgia, "Times New Roman", serif;
+
+  /* ---- >>> ACTIVE FONT — change this one line <<< -------------------------
+     var(--font-system) | var(--font-inter) | var(--font-public-sans)
+     var(--font-archivo) | var(--font-bell-mt)                                 */
+  --font-sans: var(--font-public-sans);
+
+  /* Headings follow the body font. Point this at a different candidate to
+     pair two of them (e.g. --font-bell-mt headings over --font-inter body).   */
   --font-heading: var(--font-sans);
+
+  /* ---- Heading weight — belongs WITH the font choice ----------------------
+     700 for the sans candidates: they have a true bold that still looks like
+     the family, and headings need the weight to carry.
+
+     400 for Bell MT. Its bold is a separate, much heavier and lower-contrast
+     design — at h1 size it reads as a generic bold serif and throws away the
+     delicate high-contrast look that makes Bell MT worth choosing. Set this to
+     400 whenever --font-sans is var(--font-bell-mt).
+
+     Only 400 and 700 do anything for Bell MT: it has no 500 or 600 face, so
+     the browser's nearest-match rounds 500 down to 400 and 600 up to 700.     */
+  --fw-heading: 700;
 
   --fs-body:   1rem;
   --fs-small:  0.875rem;

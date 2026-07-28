@@ -4,7 +4,7 @@
 > and performance approach of the FIFL website. Read this first before making changes.
 > Keep it up to date as the site grows.
 
-Last updated: 2026-07-27 · Status: **Skeleton / v0**
+Last updated: 2026-07-28 · Status: **Skeleton / v0**
 
 ---
 
@@ -16,7 +16,7 @@ company specializing in parts and equipment for food production.
 Design goals, in priority order:
 
 1. **Fast** — loads and navigates near-instantly, even on old computers and browsers.
-2. **Lightweight** — no frameworks, minimal JavaScript, no web-font downloads.
+2. **Lightweight** — no frameworks, minimal JavaScript, at most one small self-hosted font.
 3. **Simple & maintainable** — clean HTML, organized CSS, easy to re-theme.
 4. **Expandable** — this is the skeleton; more pages/content come later.
 
@@ -34,8 +34,8 @@ McMaster-Carr's site feels instant. We copy the ideas that matter for a small st
 | **Multi-page, server-served HTML** (not a single-page app) | Each page is its own small, complete, cacheable `.html` file. No client-side router, no hydration. | all `*.html` |
 | **Prefetch on intent** | The moment a user *hovers* or *touches* a nav link, we fetch that page in the background so the click is instant. | `js/prefetch.js` |
 | **Speculation Rules** (modern browsers) | Browsers that support it *prefetch* likely-next pages — the HTML document only, not its images. Older browsers simply ignore it and fall back to the manual hover-prefetch above. | `js/prefetch.js` |
-| **No web fonts** | Uses the OS's own UI font stack — nothing to download, no layout shift. | `css/base.css` |
-| **Tiny, cached CSS** | 3 small stylesheets, cached after first load, shared across every page. | `css/` |
+| **At most one web font** | Currently the OS's own UI font stack — nothing to download. Candidate fonts are *self-hosted* (never a Google Fonts `<link>`): one variable WOFF2, latin subset, upright only, 26–47 KB, `font-display: swap` so text is never invisible. See § Fonts. | `css/fonts.css`, `css/theme.css` |
+| **Tiny, cached CSS** | 4 small stylesheets, cached after first load, shared across every page. | `css/` |
 | **Almost no JavaScript** | Two small files: the prefetch helper (~1 KB) and the mobile menu toggle (~1 KB). The site is 100% functional with JS disabled. | `js/prefetch.js`, `js/nav.js` |
 | **Sharp, flat design** | No shadows/blur/animation to repaint. Cheap for old GPUs to render. | `css/*` |
 
@@ -70,7 +70,7 @@ More pages will be added later.
 
 | Tab | File | Contents (v0) |
 |---|---|---|
-| Home | `index.html` | Hero (company name title + square placeholder image), lorem subheader, four "areas of expertise" cards with image-background + body text. |
+| Home | `index.html` | Hero (company name title + square placeholder image), lorem subheader, a one-line strip of well-known clients, four "areas of expertise" cards with image-background + body text, a full-width banner image. |
 | About Us | `about.html` | Standard about page. Lorem ipsum + placeholders. |
 | Gallery | `gallery.html` | Static grid of placeholder images. |
 | Services | `services.html` | Intro, then one full-width band per "area of expertise" — text left, placeholder image right, alternating tint. Lorem copy. |
@@ -87,6 +87,46 @@ Each Services band carries the kebab-case `id` of its title
 (`#custom-machined-parts`, `#fabricated-components`, `#special-purpose-machine-design`,
 `#industrial-sewing`), so the Home cards can deep-link to one. **Keep the two lists in
 step** — if a service is added, renamed, or dropped, change both pages.
+
+### The client strip (Home)
+
+Between the hero and the expertise cards, Home carries a strip of the company's
+best-known clients. Names are placeholders; the boxes are sized for logos.
+
+**It is one horizontal line at every width — it never wraps and never stacks.**
+The items share the row evenly while they fit, stop shrinking at a floor
+(`min-width: 8.5rem`), and past that the strip scrolls sideways. The scrollbar is
+hidden in all three engines, because a horizontal bar under a 72px strip is most
+of its visual weight and only ever shows up on the narrow screens with the least
+room to spare.
+
+Two things replace the affordance the hidden bar took away, and both should
+survive any resizing:
+
+- The floor is chosen so a phone always shows **part** of the next item — a
+  logo cut by the edge is what tells a visitor there is more to the right.
+- The list carries `tabindex="0"`, so arrow keys scroll it. With no visible bar
+  and no tab stop, the overflowing names are unreachable without a mouse or a
+  touchscreen (WCAG 2.1.1).
+
+The strip is deliberately **not** given a `.section__title` — its label is a muted
+eyebrow. "Areas of Expertise" sits directly below it, and the red title bar is
+worth less on both if two of them share a screen (see § 5). Full notes are in
+`css/components.css` § CLIENTS STRIP, including why the row is not centred.
+
+### The full-width banner (Home)
+
+Below the expertise cards, Home ends on a single edge-to-edge image band — the
+only element on the site that ignores the 1120px content column. It is full-bleed
+by simply not being inside a `.container`; there are no negative margins and no
+`100vw` (which overflows by the scrollbar's width on any page tall enough to have
+one).
+
+**Its height is one line** — the `clamp()` in `css/components.css` § FULL-WIDTH
+BANNER, marked as the tweak point. It reads `clamp(220px, 26vw, 380px)`: a floor
+for phones, a width-relative middle so the band keeps its proportions as the
+window resizes, and a cap so it can't eat a desktop screen. Raise the third
+number if the band feels short; that is the one that governs on a laptop.
 
 ---
 
@@ -108,7 +148,7 @@ Every page shares the same shell:
 
 - **Header** is `position: sticky; top: 0` so it stays visible while scrolling.
   On very old browsers that ignore `sticky`, it degrades to a normal header (still works).
-- The active tab is marked with `aria-current="page"` and styled with a green underline.
+- The active tab is marked with `aria-current="page"` and styled with a red underline.
 
 ### The header on phones and narrow windows (below 820px)
 
@@ -212,7 +252,15 @@ to the nav list in `partials/header.html`. A root-level `.html` file with no mar
 ## 5. Design system
 
 Style direction: **simple, clean, slightly older/industrial** — sharp edges, solid borders,
-flat fills, a white + green palette. Not retro, not flashy. Minimal motion.
+flat fills, a white + navy + red palette. Not retro, not flashy. Minimal motion.
+
+The two brand colours have distinct jobs, and keeping them separate is what stops the
+site reading as loud. **Navy is structural** — links, header/footer, borders, form focus,
+the default card fill. **Red is the highlight**, and is spent only on what should draw
+the eye: the call-to-action buttons, the active tab, the `.section__title` bar, the hero
+title accent, the "Fabrication" in the wordmark, and the card hover outline. When adding
+a component, reach for navy first; a second red thing competing on the same screen costs
+the first one its emphasis.
 
 ### Colours — edit `css/theme.css` ONLY
 All colours (and core spacing/sizing) live as CSS custom properties in
@@ -231,25 +279,34 @@ which is the single source of truth. What each token is for:
 |---|---|
 | `--color-bg` | Page background |
 | `--color-surface` | Cards, alternating sections |
-| `--color-primary` | Brand green — heading accents, buttons, active tab, logo |
-| `--color-primary-dark` | Hover/pressed green |
+| `--color-primary` | Brand navy — links, header border, chrome, logo ground |
+| `--color-primary-dark` | Hover/pressed navy |
 | `--color-primary-light` | Tinted backgrounds |
-| `--color-accent` | Secondary green |
+| `--color-accent` | Brand red — buttons, active tab, title accents, logo mark |
+| `--color-accent-dark` | Hover/pressed red |
+| `--color-accent-light` | Tinted red background (ghost button hover) |
 | `--color-text` | Body text |
 | `--color-text-muted` | Secondary text |
-| `--color-text-invert` | Text on dark/green backgrounds |
+| `--color-text-invert` | Text on dark/navy/red backgrounds |
 | `--color-text-invert-muted` | Secondary text on dark backgrounds (card body copy) |
 | `--color-border` | Borders, dividers |
 | `--color-header-bg` | Header background |
-| `--color-footer-bg` | Footer background (dark green) |
-| `--color-footer-link` | Links on the dark footer |
-| `--color-focus` | Focus ring |
+| `--color-footer-bg` | Footer background (navy) |
+| `--color-footer-link` | Links on the navy footer |
+| `--color-focus` | Focus ring — see note below |
 | `--color-scrim-strong/-mid/-soft` | Darkening wash over card backgrounds |
 | `--color-card-1` … `-4` | Placeholder tints for the four expertise cards |
 
 The `--color-card-*` tints exist only so the four cards read as four different
-"images". Delete them, and the `.card--N` rules in `components.css`, once real
-background images are set.
+"images"; they alternate navy/red so the 2×2 grid reads as a deliberate
+checkerboard rather than four arbitrary colours. Delete them, and the `.card--N`
+rules in `components.css`, once real background images are set.
+
+**`--color-focus` is deliberately neither brand colour.** The ring has to clear 3:1
+against the white page *and* the navy footer, and navy fails the second while red
+fails on the card tints. It is a brighter blue than anything else in the palette for
+that reason — if the theme changes again, re-check it against both backgrounds rather
+than snapping it back to the primary.
 
 Also defined in `theme.css`: spacing scale, max content width, border width, font stacks.
 
@@ -261,12 +318,60 @@ SVG that is page chrome is therefore inlined into its partial — see the logo i
 `fill="var(--color-primary)"`. Standalone artwork used outside a page (favicon,
 social card, print) is the one place baked-in colour is correct.
 
+### Fonts — pick in `css/theme.css`, declare in `css/fonts.css`
+
+The site ships on the OS's own UI font stack. Three self-hosted candidates are wired
+up alongside it so the look can be compared without touching any markup:
+
+| Option | `--font-…` | Cost |
+|---|---|---|
+| System UI stack (current, and the fallback under every option below) | `--font-system` | 0 KB |
+| Inter | `--font-inter` | 47 KB |
+| Public Sans | `--font-public-sans` | 26 KB |
+| Archivo | `--font-archivo` | 34 KB |
+| Bell MT — **local only**, see below | `--font-bell-mt` | 0 KB |
+
+**Switching** is one line in [`css/theme.css`](css/theme.css): set `--font-sans` to one
+of the values above. `--font-heading` follows `--font-sans` unless pointed elsewhere,
+which is how a heading font gets paired with a different body font.
+
+**Heading weight travels with the font choice** — `--fw-heading`, also in `theme.css`.
+700 for the sans candidates. **400 for Bell MT**: its bold is a separate, much heavier
+and lower-contrast design, so at h1 size it reads as a generic bold serif and loses the
+delicate high-contrast look that is the whole reason to pick it. Bell MT has no 500 or
+600 face, so nearest-match rounds 500 to 400 and 600 to 700 — the choice is binary.
+
+A `@font-face` rule only *describes* a font — the file downloads only if something on
+the page asks for that family. So the unchosen candidates sit in `fonts.css` at **zero
+runtime cost**, and there is no rush to delete them.
+
+**Every stack ends in `--font-system`**, so a font that is slow, blocked, or unsupported
+degrades to exactly what the site looks like today. `font-display: swap` means text is
+painted immediately in the fallback and restyled on arrival — never invisible.
+
+**Bell MT is a licensed Monotype face bundled with MS Office.** It cannot be legally
+self-hosted, so it is wired as a plain local stack: real Bell MT on a machine with Office,
+Georgia elsewhere. Fine for judging the look, not shippable as-is — see the note at the
+foot of [`css/fonts.css`](css/fonts.css).
+
+**Removing a candidate** — three deletions, no side effects: its fenced block in
+`fonts.css`, its `.woff2` in `assets/fonts/`, its `--font-…` line in `theme.css`.
+
+Once a font is chosen for good, add a preload to each page's `<head>` to start the
+download a round trip earlier — worth ~100 ms on first paint, and only correct once the
+choice is final:
+
+```html
+<link rel="preload" href="assets/fonts/inter-latin-var.woff2" as="font" type="font/woff2" crossorigin>
+```
+
 ### CSS file organization
 Load order matters (later files can rely on earlier variables):
 
-1. **`css/theme.css`** — *variables only.* Colours, spacing, sizes, fonts. The re-theme file.
-2. **`css/base.css`** — reset, typography, layout primitives, header, footer, nav.
-3. **`css/components.css`** — reusable blocks: hero, expertise cards, service rows, gallery grid, forms, buttons, placeholders.
+1. **`css/fonts.css`** — `@font-face` declarations only. No downloads unless a font is selected.
+2. **`css/theme.css`** — *variables only.* Colours, spacing, sizes, fonts. The re-theme file.
+3. **`css/base.css`** — reset, typography, layout primitives, header, footer, nav.
+4. **`css/components.css`** — reusable blocks: hero, expertise cards, service rows, gallery grid, forms, buttons, placeholders.
 
 Class-naming convention: simple, readable, block-based (e.g. `.card`, `.card__title`,
 `.hero`, `.gallery-grid`). Keep it flat and obvious — no CSS methodology overhead.
@@ -281,6 +386,28 @@ One ratio is deliberately not constant: the **hero image is 1:1 on desktop but 1
 780px**, where the hero stacks and a square would go full-bleed — about 320px tall on a
 phone, pushing everything after it that far down. Supply the hero photo in both crops, or
 one wide enough to take a square crop on desktop.
+
+#### When the real photos arrive, decide the loading strategy
+
+There are currently **no `<img>` elements anywhere on the site** — every "image" is a CSS
+gradient, so there is nothing yet to lazy-load. The only embedded resource is the Maps
+iframe in `contact.html`, which carries `loading="lazy"`.
+
+Photography will be the heaviest thing here by a wide margin, so it is worth settling
+deliberately rather than by default. Things to weigh at that point:
+
+- **File weight and format** — resize to what's actually displayed rather than shipping
+  camera-resolution originals; consider WebP/AVIF, and `srcset` if phones should pull
+  smaller files than desktops.
+- **`loading="lazy"`** on off-screen images, and whether the above-the-fold hero should be
+  excluded from it.
+- **Explicit `width`/`height`** so nothing shifts as images arrive (the layout-shift point
+  already noted above).
+- **`<img>` vs. CSS `background-image`.** Note that §5 currently plans for the expertise
+  cards to become background images (see the `--color-card-*` note). A CSS background
+  cannot be lazy-loaded — there is no attribute for it, and the browser fetches it as soon
+  as the element renders. If that pattern spreads to the Services bands or the gallery,
+  lazy loading is lost with no missing attribute to notice it by.
 
 ---
 
@@ -349,6 +476,7 @@ FIFL-site/
 │   └── hooks/
 │       └── pre-commit    # blocks a commit if pages have drifted
 ├── css/
+│   ├── fonts.css         # @font-face for the candidate fonts — no download unless used
 │   ├── theme.css         # COLOURS + design tokens — edit here to re-theme
 │   ├── base.css          # reset, typography, layout, header/footer/nav
 │   └── components.css     # hero, cards, gallery, forms, buttons, placeholders
@@ -356,7 +484,8 @@ FIFL-site/
 │   ├── prefetch.js       # hover/touch prefetch + speculation rules
 │   └── nav.js            # mobile three-bar menu toggle (below 640px)
 └── assets/
-    └── logo.svg          # placeholder logo mark
+    ├── logo.svg          # placeholder logo mark
+    └── fonts/            # self-hosted variable WOFF2, one per candidate font
 ```
 
 The two "edit one file, everything follows" entry points are

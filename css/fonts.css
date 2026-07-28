@@ -1,0 +1,103 @@
+/* ============================================================================
+   fonts.css — SELF-HOSTED WEBFONT CANDIDATES (trial set)
+   ----------------------------------------------------------------------------
+   Nothing here is switched on by itself. A @font-face block only DESCRIBES a
+   font; the browser downloads the file lazily, and only if something on the
+   page actually asks for that family. The active family is chosen in ONE place:
+
+       css/theme.css  ->  --font-sans
+
+   So all three candidates can sit in this file at zero runtime cost, and
+   switching between them is a one-line edit in theme.css.
+
+   Why self-hosted rather than a Google Fonts <link>:
+       - one fewer DNS lookup + TLS handshake to a third-party origin
+       - no third-party request at all (privacy / GDPR: nothing leaves the site)
+       - browser caches are partitioned per-site now, so a shared CDN buys
+         nothing that a local file doesn't
+       - the files are ours: they cannot 404 or change under us
+
+   What each file is:
+       - ONE variable WOFF2 per family, weights 400-700 in a single file.
+         (Regular, semibold and bold all come out of the same download.)
+       - Latin subset only. `unicode-range` below tells the browser so — any
+         character outside that range is drawn from the fallback stack instead
+         of triggering a pointless download.
+       - Upright only, no italic file: the site uses no <em> or <i>. If italics
+         are ever added, browsers will slant the upright automatically (fine for
+         the odd word); add the real italic file if it becomes common.
+
+   WOFF2 is supported by every browser since ~2016, including Edge, iOS Safari 10
+   and Android 5. Anything older gets the system fallback stack and looks fine.
+
+   ----------------------------------------------------------------------------
+   REMOVING A CANDIDATE once the choice is made — three deletions, no side
+   effects:
+       1. delete its fenced block below
+       2. delete assets/fonts/<name>-latin-var.woff2
+       3. delete its --font-<name> line in css/theme.css
+   ========================================================================== */
+
+
+/* ==== INTER ============================================== delete-as-a-block */
+/*  assets/fonts/inter-latin-var.woff2 — 47 KB                                 */
+@font-face {
+  font-family: "Inter";
+  src: url("../assets/fonts/inter-latin-var.woff2") format("woff2");
+  font-weight: 400 700;          /* variable range — one file, all weights     */
+  font-style: normal;
+  font-display: swap;            /* show fallback text now, restyle on arrival */
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+                 U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+                 U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* ==== /INTER =============================================================== */
+
+
+/* ==== PUBLIC SANS ======================================== delete-as-a-block */
+/*  assets/fonts/public-sans-latin-var.woff2 — 26 KB                           */
+@font-face {
+  font-family: "Public Sans";
+  src: url("../assets/fonts/public-sans-latin-var.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+                 U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+                 U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* ==== /PUBLIC SANS ========================================================= */
+
+
+/* ==== ARCHIVO ============================================ delete-as-a-block */
+/*  assets/fonts/archivo-latin-var.woff2 — 34 KB                               */
+@font-face {
+  font-family: "Archivo";
+  src: url("../assets/fonts/archivo-latin-var.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+                 U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+                 U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* ==== /ARCHIVO ============================================================= */
+
+
+/* ==== BELL MT — no block here, and that is deliberate ======================
+   Bell MT is a licensed Monotype face that ships with Microsoft Office. It is
+   not open source and there is no free web licence, so it CANNOT be self-hosted
+   the way the three above are — doing so would be redistributing it.
+
+   It is still wired up in theme.css as `--font-bell-mt`, as a plain local font
+   stack. That means:
+       - on a machine that has Office installed (i.e. yours, for judging it),
+         it renders in real Bell MT
+       - on a machine that doesn't — most visitors, and every phone — it silently
+         falls back to Georgia / Times New Roman
+
+   So it is fine for previewing the look, but shipping it would mean most
+   visitors never see it. If the Bell MT direction is the one you like, the
+   options are to buy a Monotype webfont licence, or to pick a free serif with a
+   similar feel and self-host it here like the others.
+   ========================================================================== */

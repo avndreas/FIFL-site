@@ -28,9 +28,14 @@ a:hover { color: var(--color-primary-dark); }
 
 h1, h2, h3, p, ul { margin: 0 0 var(--space-md) 0; }
 
-h1 { font-size: var(--fs-h1); line-height: 1.1; font-weight: 700; }
-h2 { font-size: var(--fs-h2); line-height: 1.2; font-weight: 700; }
-h3 { font-size: var(--fs-h3); line-height: 1.25; font-weight: 700; }
+/* Family and weight both come from theme.css, because the right heading weight
+   depends on which font is active — see --fw-heading there. Keep font-weight
+   out of the rules below: they come later and would win. */
+h1, h2, h3 { font-family: var(--font-heading); font-weight: var(--fw-heading); }
+
+h1 { font-size: var(--fs-h1); line-height: 1.1; }
+h2 { font-size: var(--fs-h2); line-height: 1.2; }
+h3 { font-size: var(--fs-h3); line-height: 1.25; }
 
 /* Visible keyboard focus everywhere (accessibility) */
 :focus-visible {
@@ -54,7 +59,7 @@ h3 { font-size: var(--fs-h3); line-height: 1.25; font-weight: 700; }
 .section { padding: var(--space-xl) 0; }
 .section--tint { background: var(--color-surface); }
 .section__title {
-  border-left: var(--border-width-accent) solid var(--color-primary);
+  border-left: var(--border-width-accent) solid var(--color-accent);
   padding-left: var(--space-sm);
 }
 
@@ -109,7 +114,7 @@ h3 { font-size: var(--fs-h3); line-height: 1.25; font-weight: 700; }
   line-height: 1.15;
   letter-spacing: 0.2px;
 }
-.brand__name span { color: var(--color-primary); }
+.brand__name span { color: var(--color-accent); }
 
 /* Primary navigation tabs */
 .main-nav ul {
@@ -132,10 +137,12 @@ h3 { font-size: var(--fs-h3); line-height: 1.25; font-weight: 700; }
   color: var(--color-primary-dark);
   background: var(--color-primary-light);
 }
-/* Active tab (marked with aria-current="page" in the HTML) */
+/* Active tab (marked with aria-current="page" in the HTML).
+   Declared after :hover on purpose — same specificity, so this wins and the
+   current tab keeps its red while hovered instead of flipping to navy. */
 .main-nav a[aria-current="page"] {
-  color: var(--color-primary);
-  border-bottom-color: var(--color-primary);
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
 }
 
 /* ---- Three-bar menu button (only ever visible below 640px) --------------- */
@@ -264,10 +271,10 @@ h3 { font-size: var(--fs-h3); line-height: 1.25; font-weight: 700; }
   }
   .main-nav a[aria-current="page"] {
     border-bottom-color: var(--color-border);
-    border-left-color: var(--color-primary);
+    border-left-color: var(--color-accent);
     background: var(--color-primary-light);
   }
-  /* The overlay's own green border closes the list; a divider here would double
+  /* The overlay's own bottom border closes the list; a divider here would double
      it. Kept transparent rather than removed so the row height never changes. */
   .main-nav li:last-child a { border-bottom-color: transparent; }
 }

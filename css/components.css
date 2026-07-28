@@ -9,9 +9,9 @@
 .btn {
   display: inline-block;
   padding: var(--space-sm) var(--space-lg);
-  background: var(--color-primary);
+  background: var(--color-accent);
   color: var(--color-text-invert);
-  border: var(--border-width) solid var(--color-primary);
+  border: var(--border-width) solid var(--color-accent);
   border-radius: var(--radius);
   font-weight: 700;
   text-decoration: none;
@@ -20,17 +20,17 @@
   font-family: inherit;
 }
 .btn:hover {
-  background: var(--color-primary-dark);
-  border-color: var(--color-primary-dark);
+  background: var(--color-accent-dark);
+  border-color: var(--color-accent-dark);
   color: var(--color-text-invert);
 }
 .btn--ghost {
   background: transparent;
-  color: var(--color-primary);
+  color: var(--color-accent);
 }
 .btn--ghost:hover {
-  background: var(--color-primary-light);
-  color: var(--color-primary-dark);
+  background: var(--color-accent-light);
+  color: var(--color-accent-dark);
 }
 
 /* ---- Placeholder box (stand-in for real images; CSS-only, no downloads) --- */
@@ -75,7 +75,7 @@
   line-height: 1.05;
   margin-bottom: var(--space-md);
 }
-.hero__title span { color: var(--color-primary); }   /* highlight part of the name */
+.hero__title span { color: var(--color-accent); }    /* highlight part of the name */
 .hero__subheader {
   color: var(--color-text-muted);
   font-size: 1.1rem;
@@ -92,11 +92,96 @@
 }
 
 /* ============================================================================
+   CLIENTS STRIP  (Home) — one horizontal line, at every width
+   ----------------------------------------------------------------------------
+   Sits between the hero and the expertise cards. Three rules make it work:
+
+   1. `flex-wrap: nowrap` — the row NEVER becomes two rows or a stack. This is
+      the one thing that must not be "improved" by a later responsive tweak; a
+      logo strip that wraps to three lines on a phone is what it exists to avoid.
+   2. The items shrink to share the row while they fit, then stop at a floor
+      (`min-width`). Below that the row is wider than the container and scrolls
+      sideways instead of squeezing the names into unreadable slivers.
+   3. The scrollbar is hidden in all three engines. A horizontal bar under a
+      72px strip is most of its visual weight, and it only ever appears on the
+      narrow screens where vertical room is scarcest.
+
+   Hiding the bar removes an affordance, so two things stand in for it: the
+   floor is set so a phone always shows part of the next item (an edge-cut logo
+   reads as "more this way"), and the list carries tabindex="0" in the markup so
+   arrow keys can scroll it — without a visible bar, a keyboard-only user has no
+   other way to reach the overflow. Keep both if you change the sizes.
+
+   NOTE: no `justify-content: center` here. When a centred flex row overflows,
+   the first item is pushed off the *left* edge, where no scroll can reach it.
+   `flex-start` (the default) keeps the overflow entirely on the scrollable side.
+   ========================================================================== */
+/* No top padding: the hero's own bottom padding is the gap above the strip, so
+   the two read as one block — which is the point of putting clients here. */
+.clients { padding: 0 0 var(--space-xl); }
+
+/* An eyebrow label, not a section heading. `.section__title`'s red bar is spent
+   on "Areas of Expertise" directly below, and two red marks competing on one
+   screen costs the first one its emphasis (SITE-SPEC § 5). Weight is left to
+   --fw-heading so it still follows the theme's font choice. */
+.clients__title {
+  font-size: var(--fs-small);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-sm);
+}
+
+.clients__list {
+  display: flex;
+  flex-wrap: nowrap;              /* see rule 1 above */
+  gap: var(--space-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain; /* swiping the strip never pulls the page */
+  -webkit-overflow-scrolling: touch;        /* momentum on older iOS */
+  scroll-snap-type: x proximity;            /* ignored where unsupported */
+
+  /* Hide the scrollbar — Firefox, then old Edge/IE. WebKit/Blink is the
+     ::-webkit-scrollbar rule below. Scrolling itself is untouched. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.clients__list::-webkit-scrollbar { display: none; }
+
+.clients__item {
+  flex: 1 1 0;                    /* share the row evenly while they fit */
+  min-width: 8.5rem;              /* …and stop here; the row scrolls instead */
+  scroll-snap-align: start;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 72px;
+  padding: var(--space-sm);
+  border: var(--border-width) solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+/* ============================================================================
    EXPERTISE CARDS  (Home) — image-background + body text
    ========================================================================== */
+/* 2x2 on desktop — one row of four made each card too narrow to read as an
+   image, and the 2x2 is what the --color-card-* checkerboard assumes. The row
+   gap comes from the same `gap`, so both axes stay in step. */
 .expertise-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: var(--space-md);
 }
 .card {
@@ -104,7 +189,8 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  min-height: 240px;
+  /* min-height: 240px; */
+  aspect-ratio: 16 / 10;
   padding: var(--space-md);
   color: var(--color-text-invert);
   border: var(--border-width) solid var(--color-border);
@@ -123,7 +209,7 @@
   background-size: cover;
   background-position: center;
 }
-.card:hover { outline: var(--border-width-accent) solid var(--color-primary); }
+.card:hover { outline: var(--border-width-accent) solid var(--color-accent); }
 .card__title {
   margin: 0 0 var(--space-xs) 0;
   font-size: var(--fs-h3);
@@ -142,12 +228,43 @@
 .card--3 { background-color: var(--color-card-3); }
 .card--4 { background-color: var(--color-card-4); }
 
-@media (max-width: 900px) {
-  .expertise-grid { grid-template-columns: repeat(2, 1fr); }
-}
 @media (max-width: 520px) {
   .expertise-grid { grid-template-columns: 1fr; }
 }
+
+/* ============================================================================
+   FULL-WIDTH BANNER  (Home) — edge-to-edge image band under the expertise cards
+   ----------------------------------------------------------------------------
+   The one element on the site that ignores the 1120px content column, so it is
+   written to be full-bleed by simply not being inside a .container. Nothing
+   clever (no negative margins, no 100vw — that one adds a horizontal scrollbar
+   on any page with a vertical one, since 100vw counts the scrollbar's width).
+
+   It sits flush under the tinted expertise band above; the gap below it is the
+   footer's own margin-top.
+   ========================================================================== */
+.banner {
+  width: 100%;
+
+  /* >>> TWEAK THE HEIGHT HERE — this one line, nothing else <<<
+     clamp(floor, scales-with-width, cap):
+       220px  never shorter than this (a phone, where 26vw is tiny)
+       26vw   the height on everything in between, so the band keeps its
+              proportions as the window is resized
+       380px  never taller than this (a desktop, where 26vw would run away and
+              eat the screen — this is the number to raise if it feels short)
+     Roughly: ~220px on a phone, ~290px on a tablet, 380px on a laptop. */
+  height: clamp(220px, 26vw, 380px);
+
+  /* Side borders would be sliced in half by the viewport edges. The top and
+     bottom rules are what actually separate the band from its neighbours. */
+  border-left: 0;
+  border-right: 0;
+}
+
+/* The real photo, once it replaces the placeholder box: fill the band and crop
+   the overflow rather than squashing the picture to the ratio above. */
+img.banner { object-fit: cover; }
 
 /* ============================================================================
    SERVICE ROWS  (Services) — text left, image right, one full-width band each

@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Placeholder logo mark for Food Industry Fabrication Ltd. Replace with real logo. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="FIFL placeholder logo">
-  <rect width="64" height="64" fill="#1f7a3d"/>
+  <rect width="64" height="64" fill="#0f2747"/>
   <rect x="6" y="6" width="52" height="52" fill="none" stroke="#ffffff" stroke-width="3"/>
   <!-- simple gear + "F" motif as a stand-in -->
   <g fill="#ffffff">
     <path d="M32 16l3 4 5-1 1 5 4 3-3 4 3 4-4 3-1 5-5-1-3 4-3-4-5 1-1-5-4-3 3-4-3-4 4-3 1-5 5 1z"/>
-    <circle cx="32" cy="32" r="7" fill="#1f7a3d"/>
+    <circle cx="32" cy="32" r="7" fill="#b3121f"/>
   </g>
   <text x="32" y="37" font-family="Arial, sans-serif" font-size="11" font-weight="700"
         text-anchor="middle" fill="#ffffff">FIFL</text>

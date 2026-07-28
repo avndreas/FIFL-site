@@ -4,6 +4,7 @@
   "private": true,
   "description": "Static site for Food Industry Fabrication Ltd. No dependencies — npm is only a task runner for the scripts in tools/.",
   "scripts": {
+    "serve": "node tools/serve.js",
     "sync": "node tools/sync-partials.js",
     "check": "npm run check:partials && npm run check:colours",
     "check:partials": "node tools/sync-partials.js --check",

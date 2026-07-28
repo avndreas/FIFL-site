@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Food Industry Fabrication Ltd. — Machined Parts for Food Production</title>
   <meta name="description" content="Food Industry Fabrication Ltd. — custom machined parts, fabricated components, special purpose machine design, and industrial sewing for the food production industry.">
-  <!-- CSS load order: theme (tokens) -> base -> components -->
+  <!-- CSS load order: fonts (@font-face) -> theme (tokens) -> base -> components -->
+  <link rel="stylesheet" href="css/fonts.css">
   <link rel="stylesheet" href="css/theme.css">
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/components.css">
@@ -26,7 +27,7 @@
                 stroke="var(--color-text-invert)" stroke-width="3"/>
           <g fill="var(--color-text-invert)">
             <path d="M32 16l3 4 5-1 1 5 4 3-3 4 3 4-4 3-1 5-5-1-3 4-3-4-5 1-1-5-4-3 3-4-3-4 4-3 1-5 5 1z"/>
-            <circle cx="32" cy="32" r="7" fill="var(--color-primary)"/>
+            <circle cx="32" cy="32" r="7" fill="var(--color-accent)"/>
           </g>
           <text x="32" y="37" font-family="Arial, sans-serif" font-size="11" font-weight="700"
                 text-anchor="middle" fill="var(--color-text-invert)">FIFL</text>
@@ -80,6 +81,33 @@
       </div>
     </section>
 
+    <!-- CLIENTS: a strip of the best-known client names, sitting under the hero.
+         It is ONE horizontal line at every width — never wraps, never stacks. If
+         the names stop fitting it scrolls sideways with no visible scrollbar.
+         See css/components.css § CLIENTS STRIP. -->
+    <section class="clients" aria-labelledby="clients-title">
+      <div class="container">
+        <h2 class="clients__title" id="clients-title">Trusted by</h2>
+
+        <!-- Placeholder names. When the real logos arrive, replace each item's
+             text with an <img> carrying explicit width/height and loading="lazy"
+             (see SITE-SPEC.md § 5) — the box already centres whatever is inside.
+
+             tabindex="0" is not decoration: the scrollbar is deliberately hidden,
+             so this is what lets a keyboard user scroll the strip when it
+             overflows. Remove it and the overflowing names become unreachable
+             without a mouse or a touchscreen. -->
+        <ul class="clients__list" tabindex="0">
+          <li class="clients__item">Client One</li>
+          <li class="clients__item">Client Two</li>
+          <li class="clients__item">Client Three</li>
+          <li class="clients__item">Client Four</li>
+          <li class="clients__item">Client Five</li>
+          <li class="clients__item">Client Six</li>
+        </ul>
+      </div>
+    </section>
+
     <!-- AREAS OF EXPERTISE: four image-background cards -->
     <section class="section section--tint">
       <div class="container">
@@ -106,6 +134,20 @@
         </div>
       </div>
     </section>
+
+    <!-- FULL-WIDTH BANNER: one edge-to-edge image band. Deliberately outside
+         .container — this is the only thing on the site that runs the full width
+         of the viewport rather than the 1120px content column.
+
+         THE HEIGHT IS TUNED IN ONE PLACE: css/components.css § FULL-WIDTH BANNER.
+
+         When the real photo arrives it replaces this box entirely — no wrapper,
+         same class, and it crops instead of stretching (see the img.banner rule):
+             <img class="banner" src="assets/banner.jpg" alt="" loading="lazy"
+                  width="2000" height="800">
+         It sits below the fold, so loading="lazy" is right; width/height stop the
+         page shifting as it arrives (SITE-SPEC.md § 5). -->
+    <div class="placeholder banner">Placeholder image</div>
 
   </main>
 
