@@ -1,0 +1,7 @@
+# Work-in-progress preview — nothing here should be indexed.
+# The password gate in _worker.js is what actually enforces this; this file is
+# the polite version, for crawlers that ask first.
+# DELETE THIS FILE when the site goes live, or the real site stays unindexed.
+
+User-agent: *
+Disallow: /

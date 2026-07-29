@@ -4,7 +4,8 @@
 > and performance approach of the FIFL website. Read this first before making changes.
 > Keep it up to date as the site grows.
 
-Last updated: 2026-07-28 · Status: **Skeleton / v0**
+Last updated: 2026-07-29 · Status: **Skeleton / v0**, live on a password-protected
+preview URL (see § 9)
 
 ---
 
@@ -49,17 +50,35 @@ KB per candidate (the HTML); the images download only when the page is genuinely
 Images are and will remain the heaviest thing on this site by a wide margin, so this is the
 one setting here capable of multiplying bandwidth several-fold. Leave it as `prefetch`.
 
-### Server / hosting notes (do this when deploying)
-The static files can be hosted anywhere (Netlify, Cloudflare Pages, GitHub Pages, plain
-nginx/Apache). To match McMaster-level speed, configure the host to:
+### Server / hosting notes
+The site is hosted on **Cloudflare Pages** — how to deploy it is § 9. What that buys us
+against the list of things a host has to get right, and what is still outstanding:
 
-- Serve over **HTTP/2 or HTTP/3**.
-- Enable **gzip/brotli compression** for `.html`, `.css`, `.js`.
-- Set **long cache lifetimes** for `css/`, `js/`, `assets/` (e.g. `Cache-Control: max-age=31536000, immutable`)
-  and a short/revalidate cache for `.html`.
-- Later, when filenames are stable, consider content-hashed asset names for cache-busting.
+| Want | Status on Cloudflare Pages |
+|---|---|
+| **HTTP/2 or HTTP/3** | Automatic. Nothing to configure. |
+| **gzip/brotli** for `.html`, `.css`, `.js` | Automatic, negotiated per request. |
+| **Long cache lifetimes** for `css/`, `js/`, `assets/` | **Not automatic.** Pages sets no long-lived `max-age` of its own; assets go out with an `ETag`, so a repeat visit revalidates each file — a cheap `304`, but still a round trip. (Check the exact `Cache-Control` against the *deployed* site if it matters: the local `wrangler pages dev` server sends none at all, so it is not the thing to measure.) |
+| Content-hashed asset filenames | Not done — see § 10. |
 
-None of the above requires code changes — it's host configuration.
+The cache-lifetime gap is fixed with a `_headers` file dropped into
+[`deploy/`](deploy/), which `tools/build.js` copies to the site root alongside
+everything else there:
+
+```
+/css/*
+  Cache-Control: public, max-age=31536000, immutable
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+```
+
+**Do not add that yet.** `immutable` tells the browser never to re-check for a year, so
+the day you edit `theme.css` every returning visitor keeps the old one. It is only safe
+once filenames carry a content hash — which is why the two items are one job, not two,
+and why both sit in § 10 rather than here. While the site is a password-gated preview
+being actively changed, revalidation is the behaviour you actually want.
+
+Still no code changes in any of this — it is host configuration and one optional file.
 
 ---
 
@@ -473,8 +492,15 @@ FIFL-site/
 │   └── footer.html       # the one footer
 ├── tools/
 │   ├── sync-partials.js  # splices partials/ into every page
+│   ├── check-colours.js  # fails if a colour literal escapes theme.css
+│   ├── serve.js          # local preview server (fonts need http://, not file://)
+│   ├── build.js          # assembles dist/ — the exact files that get uploaded
 │   └── hooks/
 │       └── pre-commit    # blocks a commit if pages have drifted
+├── deploy/               # NOT site content — Cloudflare-specific, see § 9
+│   ├── _worker.js        # the password gate; runs at the edge on every request
+│   ├── robots.txt        # noindex while the site is a preview
+│   └── README.md         # deployment runbook (setup, rollback, going live)
 ├── css/
 │   ├── fonts.css         # @font-face for the candidate fonts — no download unless used
 │   ├── theme.css         # COLOURS + design tokens — edit here to re-theme
@@ -483,27 +509,199 @@ FIFL-site/
 ├── js/
 │   ├── prefetch.js       # hover/touch prefetch + speculation rules
 │   └── nav.js            # mobile three-bar menu toggle (below 640px)
-└── assets/
-    ├── logo.svg          # placeholder logo mark
-    └── fonts/            # self-hosted variable WOFF2, one per candidate font
+├── assets/
+│   ├── logo.svg          # placeholder logo mark
+│   └── fonts/            # self-hosted variable WOFF2, one per candidate font
+└── dist/                 # generated, gitignored — wiped and rebuilt every build
 ```
 
 The two "edit one file, everything follows" entry points are
 **`css/theme.css`** (all colours) and **`partials/`** (all shared markup).
 
-Note that `partials/` and `tools/` are *source*, not site content. They are harmless if
-deployed, but you can exclude them from the upload if your host makes that easy.
+`partials/`, `tools/` and `deploy/README.md` are *source*, not site content, and
+**`SITE-SPEC.md` is an internal document** — this one. None of them are uploaded:
+`tools/build.js` copies a named list into `dist/` rather than excluding a blocklist,
+so anything new added to the repo root is private by default and has to be opted in.
+Add a directory the site actually needs and you must add it to `COPY_DIRS` there, or
+it will 404 on the live site while working perfectly under `npm run serve`.
+
+### Every command, in one place
+
+There are **no npm dependencies** — `npm` is a task runner and nothing else, so every
+one of these is equally `node tools/<script>.js`. Requires Node (any recent version).
+
+| Command | What it does |
+|---|---|
+| `npm run serve` | Local preview on `:8080`. Use this for day-to-day work — web fonts do not load over `file://` (§ 5). |
+| `npm run sync` | Rewrites every page's header/footer from `partials/`. Run after editing a partial (§ 4). |
+| `npm run check` | Both checks below. Writes nothing; non-zero exit on failure. Run by the pre-commit hook *and* by `npm run deploy`. |
+| `npm run check:partials` | Fails if any page has drifted from `partials/`. |
+| `npm run check:colours` | Fails if a colour literal appears outside `theme.css` (§ 5). |
+| `npm run build` | Assembles `dist/`. Rarely run alone — `deploy` calls it. |
+| `npm run deploy` | check → build → upload to Cloudflare. **The only thing that changes the live site** (§ 9). |
+
+After a fresh `git clone`, one command is needed to arm the pre-commit hook, because
+Git never installs hooks itself:
+
+```
+git config core.hooksPath tools/hooks
+```
 
 ---
 
-## 9. Future / TODO (not in this skeleton)
+## 9. Deployment
+
+The site is on **Cloudflare Pages** at a temporary `*.pages.dev` address, behind a
+password, for as long as it is unfinished. The operational runbook — creating the
+project, setting the password, rolling back, going public — is
+[`deploy/README.md`](deploy/README.md), next to the files it describes. This section
+is the design behind it: the things worth understanding before you change anything.
+
+### Git and deployment are deliberately not connected
+
+The Pages project is a **Direct Upload** project. Cloudflare has no access to the
+repository, no webhook, and no knowledge that it exists.
+
+```
+git push          ->  GitHub only. Live site untouched.
+npm run deploy    ->  Live site updated. Git untouched.
+```
+
+The alternative — Cloudflare's Git integration — republishes on every push to
+`master`, and that is the wrong shape for this project. This is a work-in-progress
+site being shown to a client; commit hygiene and "is this fit to be seen" are
+different questions and must stay on different triggers. Version control should
+cost nothing to use.
+
+The corollary is that deploying does not require committing first, so a half-finished
+experiment can be put in front of someone without touching history. **Do not connect
+the repo in the Cloudflare dashboard**, and note that a deploy uploads your working
+tree as it is on disk, not the last commit — if the two have drifted, what you see
+live is the former.
+
+### `npm run deploy`
+
+Three steps, and it stops at the first failure:
+
+1. **`npm run check`** — the same partials and colour checks the pre-commit hook runs
+   (§ 4, § 5). A page with a stale header or a stray colour literal cannot reach the
+   live site, which is the whole reason the check is wired in here as well as at commit
+   time; the two triggers are independent and neither implies the other.
+2. **`npm run build`** — [`tools/build.js`](tools/build.js) wipes `dist/` and copies in
+   the pages, `assets/`, `css/`, `js/`, and the contents of `deploy/`. Nothing is
+   transformed or minified; the deployed pages are byte-for-byte the ones you preview
+   locally. Wiping rather than overwriting means a file deleted from the repo cannot
+   survive in `dist/` and keep being published.
+3. **`wrangler pages deploy`** — uploads `dist/`. Only changed files transfer, so after
+   the first run it takes seconds.
+
+Wrangler is invoked with `npx`, so there is still **nothing in `node_modules/` and no
+dependency in `package.json`** — npm remains a task runner.
+
+**The version is pinned exactly (`wrangler@4.115.0`), and that matters more than it
+looks.** A range like `wrangler@4` cannot be resolved without asking the registry, so
+npm re-resolves on *every* invocation: a network round trip each time, and the warning
+`the following package was not found and will be installed` on every deploy, even
+though the package is cached and nothing is downloaded. An exact version is answerable
+from the local npx cache, so it runs silently and offline. The reliable win is the
+removed network dependency and the removed warning — startup time is ~5–7 s either way,
+dominated by npx and wrangler's own boot, so do not expect the pin to feel faster.
+
+To upgrade wrangler, change the number in `package.json` **and** in
+[`deploy/README.md`](deploy/README.md), then run it once to populate the cache. Note
+that each distinct spec string gets its own ~170 MB cache entry under
+`$(npm config get cache)/_npx`, so changing it repeatedly is worth a periodic
+`npm cache clean --force`.
+
+Every deploy is retained, and any earlier one can be promoted back to live from the
+Cloudflare dashboard without touching git. That is the rollback path.
+
+### The password gate
+
+[`deploy/_worker.js`](deploy/_worker.js) runs at Cloudflare's edge in front of every
+request, and serves nothing at all — not a page, not `robots.txt` — without HTTP Basic
+credentials. Search engines therefore cannot index the site, because they cannot read
+it; `robots.txt` and the `X-Robots-Tag` header on authenticated responses are the
+polite second and third layers, not the mechanism.
+
+Three properties of it are load-bearing:
+
+- **It fails closed.** If `PREVIEW_PASSWORD` is missing from the environment the worker
+  returns 503. A misconfiguration takes the site *down*, never *public*. Any change to
+  this file must preserve that; "serve it anyway if the password isn't set" is the one
+  edit that would defeat the entire arrangement.
+- **The password is never in the repo.** It is a Cloudflare secret, stored encrypted,
+  injected as `env.PREVIEW_PASSWORD`. Locally it comes from `.dev.vars`, which is
+  gitignored. Do not add a default password to `_worker.js` as a convenience.
+- **`tools/build.js` refuses to build if `_worker.js` is absent**, so the gate cannot go
+  missing quietly and leave a deploy publishing the unfinished site in the open.
+
+It is the site's only server-side code, and the only file in the project written as an
+ES module against the browser `fetch` API rather than as a CommonJS Node script — it
+runs on Cloudflare's runtime, not on Node.
+
+### Two behaviours that differ from `npm run serve`
+
+Cloudflare's static-asset serving is not the same as `tools/serve.js`, and both
+differences are worth knowing before they surprise you:
+
+- **`about.html` is served at `/about`**, and `/about.html` 308-redirects there. Every
+  link in the site says `about.html`, so each navigation costs one extra redirect. It
+  works and the address bar just shows the tidier URL. Rewriting the links to
+  extensionless form would remove the hop but break opening pages from the file
+  system, which is a worse trade for this site.
+- **A URL that does not exist returns the homepage with a `200`**, not a 404. See § 10 —
+  this one is a genuine defect and should be fixed before the site goes public.
+
+---
+
+## 10. Future / TODO (not in this skeleton)
+
+### Add a `404.html` — the site currently has no 404 page
+
+**This is a real defect, not a nicety, and it only appears once deployed.** Cloudflare
+Pages serves `404.html` from the site root when a URL matches nothing. There isn't one,
+so Pages falls back to **serving `index.html` with a `200 OK`**. A visitor who mistypes
+a URL, or follows a stale link from anywhere, silently lands on the homepage and is told
+by the status code that it was the page they asked for. Search engines treat that as
+"soft 404" duplicate content, and it hides broken links from you entirely, since nothing
+ever reports an error. Verified against Cloudflare's runtime: `/nope.html` and
+`/deep/missing/path` both return the full homepage with `200`.
+
+`npm run serve` returns a plain `404` for the same URLs, so **this cannot be reproduced
+locally** — it is a property of the host, and the local server is the more correct of
+the two. To see it, run the site through `wrangler pages dev` (`deploy/README.md`).
+
+Fixing it is a normal page, not special handling:
+
+1. Create `404.html` at the repo root, with the same four marker comments as every
+   other page so it joins the `npm run sync` rotation (§ 4). It has no nav tab, so no
+   link matches and no `aria-current` is set — which is correct.
+2. Keep it in the site's own design: header, footer, a short "page not found" message,
+   and a link back to Home. Nothing clever.
+3. `tools/build.js` picks up every root-level `*.html` automatically, so it needs no
+   build change.
+4. Also add it to the nav-less exceptions in your head, not to `EXCLUDE` in
+   `tools/sync-partials.js` — it *should* be synced.
+
+Worth doing before the site is shown to anyone outside the project, and required
+before it goes public.
+
+### Everything else
 
 - Real content, copy, and photography.
 - Real logo.
 - Real copy and photography for the four **Services** bands (structure is in place; text is lorem).
 - Wire up the contact form to a handler.
 - Real email address and phone number on **Contact** (the address and map are done).
-- Optional: content-hashed asset filenames for long-term caching.
+- **When going public:** delete `deploy/_worker.js` **and** `deploy/robots.txt`, and drop
+  the `_worker.js` guard at the top of `tools/build.js`. Both files, not one — a
+  surviving `robots.txt` would keep the finished site out of Google indefinitely, and
+  it is the failure mode nobody notices for months. Checklist in
+  [`deploy/README.md`](deploy/README.md).
+- Content-hashed asset filenames, **paired with** the long-lived `_headers` cache rules
+  sketched in § 2. One job: the headers are only safe once the filenames change with
+  their contents. Neither half alone is an improvement.
 - Optional: graduate `tools/sync-partials.js` into a real static-site generator
   (**Eleventy** is the closest fit to this site's philosophy — plain HTML in, plain HTML
   out, no client-side runtime). Worth doing only when *more* than the header/footer is
