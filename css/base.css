@@ -145,7 +145,7 @@ h3 { font-size: var(--fs-h3); line-height: 1.25; }
   border-bottom-color: var(--color-accent);
 }
 
-/* ---- Three-bar menu button (only ever visible below 640px) --------------- */
+/* ---- Three-bar menu button (only ever visible below 820px) --------------- */
 .nav-toggle {
   display: none;                 /* the media query below turns it on */
   align-items: center;
@@ -193,19 +193,35 @@ h3 { font-size: var(--fs-h3); line-height: 1.25; }
 /* ============================================================================
    MOBILE MENU  (below 820px)
    ----------------------------------------------------------------------------
-   The brand plus five tabs need a MEASURED 755px to sit on one row. Below that
-   they wrap to a second row under the brand (and to a third on a phone), and
-   because the header is sticky that cost is paid for the whole scroll. So below
-   820px the tabs collapse behind the three-bar button instead: brand + button
-   on one row, the menu opening as a full-width column underneath.
+   The brand plus five tabs stop fitting one row somewhere below 800px. Below
+   that they wrap to a second row under the brand (and to a third on a phone),
+   and because the header is sticky that cost is paid for the whole scroll. So
+   below 820px the tabs collapse behind the three-bar button instead: brand +
+   button on one row, the menu opening as a full-width column underneath.
 
-   Why 820 and not 755: 755 is what THIS text measures in the system font stack
-   on Windows. The stack resolves to a different face on macOS, iOS and Android,
-   and the brand name may yet change, so the breakpoint carries ~65px of slack.
-   820 is also already a breakpoint in components.css (.contact-grid).
+   WHY 820 IS A ROUND NUMBER AND NOT A MEASUREMENT.
+   The original figure was 755px, measured for this brand text in the system
+   font stack on Windows, and 820 was set above it to carry ~65px of slack. That
+   slack is the load-bearing part, because the measurement is not stable:
 
-   If you re-measure after a copy change, the number that matters is the width
-   at which .site-header stops being ~71px tall and becomes ~116px.
+     - the system stack resolves to a different face on macOS, iOS and Android;
+     - the site no longer uses that stack. --font-sans is Public Sans (see
+       theme.css), a wider grotesque than Segoe UI, so the real minimum is
+       probably ABOVE 755 and the slack correspondingly smaller than 65px;
+     - the brand name is placeholder copy and may yet change.
+
+   So treat 820 as "comfortably clear of the fitting width", not as a fit. It
+   has held through a font change without wrapping, and it is already a
+   breakpoint in components.css (.contact-grid), which is a second reason to
+   keep it rather than chase the exact number.
+
+   TO RE-MEASURE, after a font change or new brand/nav copy:
+     1. DevTools, responsive mode, start at 900px wide.
+     2. Narrow until .site-header's computed height jumps from ~71px to ~116px.
+        That jump IS the nav wrapping to a second row — it is the only thing to
+        look for, and it is unambiguous.
+     3. If that width is within ~40px of 820, raise 820 (and the .contact-grid
+        breakpoint with it, so the two stay in step).
 
    Note what is deliberately NOT here: a smaller tap target. An earlier version
    shrank the nav padding at this breakpoint, which took each link to ~41px tall

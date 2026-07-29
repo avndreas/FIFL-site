@@ -29,6 +29,12 @@
    page — the text inside is rewritten, only the HEADER/FOOTER names matter) and
    it joins the rotation automatically. A root page with no markers is an error,
    so nothing can silently opt out; genuine exceptions go in EXCLUDE below.
+
+   Two per-page transforms happen during the splice, both driven by the page's
+   filename — see the sets and functions below:
+       EXCLUDE        skip the page entirely
+       ROOT_RELATIVE  rewrite the partial's relative hrefs root-relative,
+                      for a page served at a URL other than its own (404.html)
    ========================================================================== */
 "use strict";
 
@@ -42,6 +48,27 @@ const PARTIALS_DIR = path.join(ROOT, "partials");
 const EXCLUDE = new Set([
   // "landing-standalone.html",
 ]);
+
+/**
+ * Pages that get served at a URL which is NOT their own path, and so cannot use
+ * relative links.
+ *
+ * 404.html is the only one. Cloudflare Pages answers /deep/missing/path with
+ * 404.html's contents while leaving that URL in the address bar, so a relative
+ * href="contact.html" in the header would resolve to /deep/missing/contact.html
+ * and 404 in its turn. The whole page would arrive unstyled with a dead nav —
+ * the worst possible moment for it.
+ *
+ * The five real pages keep their relative links, because that is what lets them
+ * be opened straight from the file system (SITE-SPEC § 9). So the fix is scoped
+ * to the page that needs it: the partial is spliced in as normal and its
+ * relative hrefs are rewritten root-relative on the way, by rootRelative()
+ * below. ONE partial still, and no per-page copy to maintain.
+ *
+ * A page listed here must also use root-relative paths in its own <head> and
+ * <body> — those are outside the markers and this script never sees them.
+ */
+const ROOT_RELATIVE = new Set(["404.html"]);
 
 /** Marker name -> partial file. Order is irrelevant; both are independent. */
 const REGIONS = [
@@ -70,6 +97,19 @@ function indentBlock(text, indent) {
     .split("\n")
     .map((line) => (line.trim() === "" ? "" : indent + line))
     .join("\n");
+}
+
+/**
+ * Rewrite the partial's relative hrefs to root-relative — `about.html` becomes
+ * `/about.html`. For the pages in ROOT_RELATIVE only; see the note there.
+ *
+ * Left alone: anything already absolute (`/…`), a bare fragment (`#main` — it
+ * must keep resolving against the current document, which is exactly why this
+ * is done here rather than with a single <base href="/">), and any URL with a
+ * scheme (http:, mailto:, tel:).
+ */
+function rootRelative(block) {
+  return block.replace(/href="(?!\/|#|[a-z][a-z0-9+.\-]*:)/gi, 'href="/');
 }
 
 /**
@@ -142,7 +182,10 @@ for (const page of pages) {
     const indent = updated.slice(lineStart, open.index);
 
     let body = indentBlock(partials[region.name], indent);
+    // setActiveTab first: it matches the partial's RELATIVE hrefs, so it has to
+    // run before rootRelative() rewrites them.
     if (region.name === "HEADER") body = setActiveTab(body, page);
+    if (ROOT_RELATIVE.has(page)) body = rootRelative(body);
 
     const block =
       indent +

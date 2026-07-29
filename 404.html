@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Page not found — Food Industry Fabrication Ltd.</title>
+  <meta name="description" content="That page could not be found.">
+  <!-- ROOT-RELATIVE PATHS, and this is the one page that needs them.
+       Cloudflare Pages answers any unmatched URL with this file's contents while
+       leaving the requested URL in the address bar, so /deep/missing/path would
+       resolve a relative "css/base.css" to /deep/missing/css/base.css and arrive
+       unstyled. Every path in this file starts with "/" for that reason. The
+       header/footer below get the same treatment automatically — 404.html is in
+       ROOT_RELATIVE in tools/sync-partials.js. The other five pages keep their
+       relative paths so they still open from the file system (SITE-SPEC § 9).
+
+       The consequence, and it is the right trade: this page alone does not
+       render correctly when opened directly off disk. Preview it over http with
+       `npm run serve` and any made-up URL. -->
+  <link rel="stylesheet" href="/css/fonts.css">
+  <link rel="stylesheet" href="/css/theme.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <!-- ===== HEADER — generated from partials/header.html · DO NOT EDIT ===== -->
+  <header class="site-header">
+    <div class="container site-header__inner">
+      <a class="brand" href="/index.html" aria-label="Food Industry Fabrication Ltd. — Home">
+        <!-- Placeholder logo mark, inlined so it inherits the theme.css colours.
+             An <img src="*.svg"> renders in its own document and cannot see them. -->
+        <svg class="brand__logo" viewBox="0 0 64 64" width="40" height="40"
+             aria-hidden="true" focusable="false">
+          <rect width="64" height="64" fill="var(--color-primary)"/>
+          <rect x="6" y="6" width="52" height="52" fill="none"
+                stroke="var(--color-text-invert)" stroke-width="3"/>
+          <g fill="var(--color-text-invert)">
+            <path d="M32 16l3 4 5-1 1 5 4 3-3 4 3 4-4 3-1 5-5-1-3 4-3-4-5 1-1-5-4-3 3-4-3-4 4-3 1-5 5 1z"/>
+            <circle cx="32" cy="32" r="7" fill="var(--color-accent)"/>
+          </g>
+          <text x="32" y="37" font-family="Arial, sans-serif" font-size="11" font-weight="700"
+                text-anchor="middle" fill="var(--color-text-invert)">FIFL</text>
+        </svg>
+        <span class="brand__name">Food Industry<br><span>Fabrication</span> Ltd.</span>
+      </a>
+
+      <!-- Three-bar menu button. Shown only below 820px, where the brand and the
+           five tabs no longer fit one row (see css/base.css § MOBILE MENU).
+
+           It ships with `hidden` and is revealed by js/nav.js. That way a browser
+           with JavaScript disabled never sees a button that cannot do anything —
+           it falls back to the plain, always-visible nav below. -->
+      <button class="nav-toggle" type="button" hidden
+              aria-label="Menu" aria-expanded="false" aria-controls="primary-nav">
+        <svg class="nav-toggle__icon" viewBox="0 0 24 24" width="24" height="24"
+             aria-hidden="true" focusable="false">
+          <path d="M3 6h18M3 12h18M3 18h18" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+
+      <nav class="main-nav" id="primary-nav" aria-label="Primary">
+        <ul>
+          <li><a href="/index.html">Home</a></li>
+          <li><a href="/about.html">About Us</a></li>
+          <li><a href="/services.html">Services</a></li>
+          <li><a href="/gallery.html">Gallery</a></li>
+          <li><a href="/contact.html">Contact</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+  <!-- ===== /HEADER ===== -->
+
+  <main id="main">
+    <section class="section">
+      <div class="container">
+        <h1 class="section__title">Page not found</h1>
+        <div class="page-intro">
+          <p class="lead">
+            The page you asked for does not exist — it may have been moved, or
+            the address may have a typo in it.
+          </p>
+          <p>
+            The tabs above go everywhere on the site, or head straight back to
+            the home page.
+          </p>
+          <p><a class="btn" href="/index.html">Back to home</a></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===== FOOTER — generated from partials/footer.html · DO NOT EDIT ===== -->
+  <footer class="site-footer">
+    <div class="container site-footer__inner">
+      <p>&copy; 2026 Food Industry Fabrication Ltd. All rights reserved.</p>
+      <p><a href="/contact.html">Contact us</a></p>
+    </div>
+  </footer>
+  <!-- ===== /FOOTER ===== -->
+
+  <script src="/js/prefetch.js" defer></script>
+  <script src="/js/nav.js" defer></script>
+</body>
+</html>

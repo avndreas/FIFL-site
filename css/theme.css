@@ -29,16 +29,32 @@
   --color-text-invert:   #ffffff;   /* text on dark/navy/red backgrounds     */
   --color-text-invert-muted: #e8edf5; /* secondary text on dark backgrounds  */
 
-  /* ---- Lines & chrome ---------------------------------------------------- */
+  /* ---- Lines & chrome -----------------------------------------------------
+     Where one of these IS another token, it references it rather than
+     repeating the literal. Two copies of the same navy are two things that can
+     drift apart on the next re-theme. The token name stays, so pointing the
+     footer (or the header) at a different colour is still a one-line edit.   */
   --color-border:        #c9d2de;   /* borders, dividers                     */
-  --color-header-bg:     #ffffff;   /* header background                     */
-  --color-footer-bg:     #b3121f;   /* brand red                             */
+  --color-header-bg:     var(--color-bg);      /* header background          */
+  --color-footer-bg:     var(--color-primary); /* footer ground: brand navy   */
   --color-footer-link:   #cddcf0;   /* links on the navy footer              */
 
   /* ---- Focus ring (accessibility) -----------------------------------------
-     A brighter blue than either brand colour on purpose: it has to clear 3:1
-     against the white page AND the navy footer, which neither navy nor red
-     manages on both.                                                        */
+     The one visible keyboard-focus indicator on the site (see base.css
+     :focus-visible). A brighter blue than either brand colour on purpose: it
+     has to clear 3:1 (WCAG 1.4.11) against the white page AND the navy footer,
+     and neither brand colour manages both — navy fails on the footer, red
+     fails on the card tints.
+
+     Measured, so the next person does not have to recompute it:
+         vs --color-bg      #ffffff   4.88:1
+         vs --color-footer-bg (navy)  3.07:1
+         vs --color-surface #f1f7ff   4.53:1
+     A pass on all three, but 3.07 is the tight one. RE-CHECK BOTH ENDS if the
+     palette changes again — a footer that stops being navy is exactly what
+     breaks this, silently, with nothing on screen to notice. #3d82e8 is the
+     more balanced alternative (3.96 navy / 3.78 white) if more margin is ever
+     wanted; brighter than that starts failing against the white page.        */
   --color-focus:         #2f6fd0;
 
   /* ---- Overlay scrim ------------------------------------------------------
@@ -55,7 +71,7 @@
      once real background images are set.                                     */
   --color-card-1:        #12325c;
   --color-card-2:        #8c1420;
-  --color-card-3:        #1c4272;
+  --color-card-3:        var(--color-primary-dark); /* same navy — see above  */
   --color-card-4:        #6d1018;
 
   /* ---- Spacing scale ----------------------------------------------------- */

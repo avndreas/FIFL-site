@@ -1,5 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Placeholder logo mark for Food Industry Fabrication Ltd. Replace with real logo. -->
+<!-- TEMPORARY placeholder logo mark for Food Industry Fabrication Ltd. The real
+     logo is coming and replaces this file.
+
+     TWO PLACES, not one. Nothing on the site loads this file today: the header
+     logo is a SEPARATE, INLINE copy of this artwork in partials/header.html,
+     because an <img src="*.svg"> renders in its own document and cannot see the
+     page's CSS variables, so it could never follow the theme. So when the real
+     logo arrives, update BOTH — this file AND the inline SVG in the partial.
+     Getting only one of them is the likely mistake, and the site would keep
+     showing the old mark while this file looked done.
+
+     This file exists for the uses that sit OUTSIDE a page, where CSS variables
+     do not resolve and baked-in colour is correct: a favicon, a social card,
+     print. None of those are wired up yet, which is why nothing references it.
+     The hex values below are therefore deliberate, and tools/check-colours.js
+     exempts assets/*.svg for exactly this reason — but they are copies of
+     --color-primary / --color-accent / --color-text-invert from css/theme.css,
+     so a re-theme has to come back here by hand. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="FIFL placeholder logo">
   <rect width="64" height="64" fill="#0f2747"/>
   <rect x="6" y="6" width="52" height="52" fill="none" stroke="#ffffff" stroke-width="3"/>

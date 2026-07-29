@@ -1,13 +1,15 @@
 /* ============================================================================
    nav.js — MOBILE MENU TOGGLE
    ----------------------------------------------------------------------------
-   Below 640px the five nav tabs collapse behind a three-bar button (the CSS
-   lives in css/base.css § MOBILE MENU). This script is the whole behaviour.
+   Below 820px the five nav tabs collapse behind a three-bar button (the CSS
+   lives in css/base.css § MOBILE MENU, which is also where the breakpoint is
+   explained — do not confuse it with the 640px --fs-h1 one). This script is the
+   whole behaviour.
 
    Progressive enhancement, in the site's usual shape: the button ships in the
    HTML with the `hidden` attribute, and only this script takes it off. So a
    browser with JavaScript disabled never gets a dead control — it just keeps
-   the plain, always-visible nav. Nothing here runs above 640px either; the
+   the plain, always-visible nav. Nothing here is width-aware at all; the
    collapsing is done entirely by the media query, and this only flips the
    attributes the media query reads.
 
