@@ -10,6 +10,7 @@
     "check:partials": "node tools/sync-partials.js --check",
     "check:colours": "node tools/check-colours.js",
     "build": "node tools/build.js",
-    "deploy": "npm run check && npm run build && npx wrangler@4.115.0 pages deploy dist --project-name=fifl-site --branch=master --commit-dirty=true"
+    "deploy": "npm run check && npm run build && npx wrangler@4.115.0 pages deploy dist --project-name=fifl-site --branch=master --commit-dirty=true",
+    "postdeploy": "echo Live at https://fifl-site.pages.dev/ -- the hash URL above is a permanent snapshot of this one deploy, not a replacement"
   }
 }

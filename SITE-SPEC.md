@@ -661,6 +661,7 @@ one of these is equally `node tools/<script>.js`. Requires Node (any recent vers
 | `npm run check:colours` | Fails if a colour literal appears outside `theme.css` (§ 5). |
 | `npm run build` | Assembles `dist/`. Rarely run alone — `deploy` calls it. |
 | `npm run deploy` | check → build → upload to Cloudflare. **The only thing that changes the live site** (§ 9). |
+| `npm run postdeploy` | Runs automatically after `deploy` (npm's `post*` convention). Only prints the live URL, because wrangler prints a different one — § 9. |
 
 After a fresh `git clone`, one command is needed to arm the pre-commit hook, because
 Git never installs hooks itself:
@@ -737,6 +738,25 @@ that each distinct spec string gets its own ~170 MB cache entry under
 
 Every deploy is retained, and any earlier one can be promoted back to live from the
 Cloudflare dashboard without touching git. That is the rollback path.
+
+#### Every deploy produces two URLs, and wrangler prints the wrong one
+
+- **`fifl-site.pages.dev`** is the live site — always the newest *production*
+  deployment. This is the link you give people.
+- **`<hash>.fifl-site.pages.dev`** is an immutable snapshot of one single deploy, kept
+  forever. It is what makes rollback possible.
+
+Wrangler's closing line prints only the hash URL, which reads as though production was
+skipped and a throwaway link created instead. It wasn't; the two are created together.
+The `postdeploy` script exists purely to print the live URL afterwards and settle the
+question, because this looks like a bug every time and is not one.
+
+The authority on what is live is Cloudflare, not the terminal — `pages deployment list
+--project-name=fifl-site` has an `Environment` column, and anything serving the live URL
+reads `Production`. **`Preview` in that column is the one genuine failure mode**: it
+means the `--branch` in the deploy script has stopped matching the project's production
+branch (`master`), and only then does the live URL really not move. A stale-looking live
+URL with `Production` in that column is a browser cache; hard-reload it.
 
 ### The password gate
 

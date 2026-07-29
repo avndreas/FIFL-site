@@ -83,6 +83,39 @@ which runs, in order:
 Uncommitted changes deploy fine — the two systems are independent. Deploying
 does not require committing, and committing does not deploy.
 
+### The URL wrangler prints is not the live site
+
+Wrangler ends with something like
+`Take a peek over at https://85d7fde7.fifl-site.pages.dev`. **That is not a
+replacement for `fifl-site.pages.dev`, and it does not mean production was
+skipped.** Every deployment gets two addresses:
+
+| Address | What it is |
+|---|---|
+| `fifl-site.pages.dev` | **The live site.** Always the newest production deployment. This is the link you give people. |
+| `85d7fde7.fifl-site.pages.dev` | An immutable snapshot of *that one deploy*, kept forever. This is what makes rollback possible, and it is handy for showing someone a specific older version. |
+
+Wrangler only prints the second one, which reads as though the first was ignored.
+It wasn't. The `postdeploy` script in `package.json` prints the live URL
+afterwards to make that unambiguous.
+
+To confirm which deployment is live, ask Cloudflare rather than reading the
+terminal — the `Environment` column says `Production` for anything serving
+`fifl-site.pages.dev`:
+
+```
+npx wrangler@4.115.0 pages deployment list --project-name=fifl-site
+```
+
+If the live URL really does look stale, it is almost always the browser: hard
+reload with **Ctrl+Shift+R**. Pages serves HTML with an `ETag` and no long
+`max-age`, so a normal reload revalidates and a hard reload is decisive.
+
+*If* the `Environment` column ever says `Preview` instead, that is the one real
+failure mode: it means the `--branch` in the deploy script no longer matches the
+project's production branch (`master`), and only then does production genuinely
+not update.
+
 ### Rolling back
 
 Every deploy is kept. In the Cloudflare dashboard, under
