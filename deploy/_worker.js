@@ -24,11 +24,11 @@
    Environment (all set in Cloudflare, never in this repo — see deploy/README.md):
        PREVIEW_PASSWORD   required   the gate. Missing = fail closed.
        PREVIEW_USER       optional   defaults to "fifl"
-       EDITS              optional   KV namespace binding. Missing = edit mode
-                                     is unavailable; the SITE IS UNAFFECTED.
-       UPLOADS            optional   R2 bucket binding, for client photos.
-                                     Missing = photos unavailable, text editing
-                                     and the SITE both unaffected.
+       EDITS              optional   KV namespace binding. Holds BOTH the sent
+                                     batches (key prefix "edit:") and the photo
+                                     files themselves (prefix "photo:").
+                                     Missing = edit mode is unavailable; the
+                                     SITE IS UNAFFECTED.
        NOTIFY_EMAIL       optional   where to email when a batch arrives
        NOTIFY_FROM        optional   sender, on a domain onboarded to Email Sending
        CF_ACCOUNT_ID      optional   for the Email Sending REST call
@@ -72,7 +72,11 @@ const PRIVATE_PATHS = ["/edits", "/api/edits", "/api/upload", "/api/photo"];
 /** Newest batches shown at /edits. Older ones stay in KV, just off the page. */
 const REVIEW_LIMIT = 25;
 
-/** Refuse absurd images. A 2400px WebP is ~0.5 MB; this is generous headroom. */
+/**
+ * Refuse absurd images. A 2400px WebP is ~0.5 MB, so this is generous headroom —
+ * and it sits comfortably under KV's own 25 MB ceiling per value, which is the
+ * real limit photos are stored against (see receiveUpload).
+ */
 const MAX_PHOTO_BYTES = 12 * 1024 * 1024;
 
 /** Refuse absurd payloads outright rather than paying to store them. */
@@ -197,6 +201,21 @@ function escapeHtml(value) {
 }
 
 /**
+ * What a removal asks for, in words.
+ *
+ * `onSite: false` means the photo it names never reached `assets/` — he is
+ * retracting one he sent in an earlier batch, so the only thing to do is not
+ * place it. `back` is what should be showing instead; empty means the picture
+ * placeholder.
+ */
+function removalInstead(edit) {
+  if (edit.back) return "leave " + edit.back + " as it is";
+  return edit.onSite
+    ? "put the picture placeholder back"
+    : "leave the picture placeholder as it is";
+}
+
+/**
  * The plain-text form of a batch. Used for the notification email and for the
  * "Copy all" button, so what you read in your inbox and what you paste into an
  * editor are the same thing.
@@ -229,6 +248,13 @@ function batchToText(batch) {
           lines.push("  NOTE:         browser could not read this format (HEIC?) —");
           lines.push("                uploaded untouched, needs converting.");
         }
+      } else if (edit.kind === "remove") {
+        lines.push(
+          "  REMOVE:       " +
+            edit.was +
+            (edit.onSite ? "" : "   (a photo he sent earlier — never on the site)")
+        );
+        lines.push("  INSTEAD:      " + removalInstead(edit));
       } else {
         lines.push("  OLD: " + edit.before);
         lines.push("  NEW: " + edit.after);
@@ -304,6 +330,20 @@ function renderBatch(key, batch) {
           escapeHtml(src) +
           '">Download</a></p>';
         html += "</div></div>";
+      } else if (edit.kind === "remove") {
+        html +=
+          '<p class="gone"><b>' +
+          (edit.onSite ? "Take this photo out" : "Do not use this photo") +
+          "</b> — " +
+          escapeHtml(removalInstead(edit)) +
+          ".</p>";
+        html +=
+          '<p class="was">' +
+          escapeHtml(edit.was) +
+          (edit.onSite
+            ? ""
+            : ' <span class="muted">— a photo he sent earlier, never on the site</span>') +
+          "</p>";
       } else {
         html += '<p class="old"><span>OLD</span>' + escapeHtml(edit.before) + "</p>";
         html += '<p class="new"><span>NEW</span>' + escapeHtml(edit.after) + "</p>";
@@ -349,6 +389,9 @@ function renderReviewPage(batches, note) {
     ".old{background:#2a1a1d;color:#ffb4b4}",
     ".new{background:#12241d;color:#8ce0b8}",
     ".old span,.new span{display:inline-block;width:44px;opacity:.55;user-select:none}",
+    ".gone{margin:0 0 6px;padding:8px 10px;border-radius:2px;background:#2a1a1d;color:#ffb4b4}",
+    ".gone b{color:#ff8f8f}",
+    ".was{margin:0 0 6px;font-size:13px;color:#8b93a1;word-break:break-word}",
     ".batch__foot{display:flex;gap:10px;padding:14px 18px;background:#161a21;",
     "border-top:1px solid #2a2f3a;flex-wrap:wrap}",
     "button{font:inherit;padding:9px 16px;border:0;border-radius:2px;cursor:pointer}",
@@ -454,20 +497,6 @@ function requireStore(env) {
       );
 }
 
-/** Photos need R2. Text editing and the SITE do not — degrade, never fail. */
-function requireBucket(env) {
-  return env.UPLOADS
-    ? null
-    : json(
-        {
-          error:
-            "The UPLOADS R2 bucket is not bound to this Pages project. " +
-            "See deploy/README.md.",
-        },
-        503
-      );
-}
-
 /**
  * Receive one photo, immediately, as a raw body.
  *
@@ -477,9 +506,26 @@ function requireBucket(env) {
  *
  * The response carries the URL the editor paints with, so a successful upload
  * doubles as proof the file is really readable back out.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY KV AND NOT R2
+ * ---------------------------------------------------------------------------
+ * R2 is the purpose-built place for blobs and this was written against it
+ * first. It is not used because switching R2 on requires a payment method on
+ * the Cloudflare account, and this site does not need one: a processed photo is
+ * ~0.5 MB against KV's 25 MB per-value ceiling, and one upload is one write
+ * against a 1,000/day free allowance.
+ *
+ * Photos share the EDITS namespace under a "photo:" prefix. Nothing collides,
+ * because the review page lists batches with `list({ prefix: "edit:" })` and
+ * never sees them.
+ *
+ * **Move to R2 if the gallery ever holds hundreds of photos**, or if a single
+ * image could approach 25 MB. That is a change to these two functions and one
+ * binding — deliberately not spread any wider.
  */
 async function receiveUpload(request, env) {
-  const missing = requireBucket(env);
+  const missing = requireStore(env);
   if (missing) return missing;
 
   const length = Number(request.headers.get("Content-Length") || 0);
@@ -493,33 +539,40 @@ async function receiveUpload(request, env) {
   // Keep his readable name for the download, but never let it decide the key.
   const raw = request.headers.get("X-Photo-Name") || "photo";
   const safe = raw.replace(/[^A-Za-z0-9._-]/g, "-").slice(0, 80);
-  const key = "photos/" + crypto.randomUUID() + "-" + safe;
+  const key = "photo:" + crypto.randomUUID() + "-" + safe;
 
-  await env.UPLOADS.put(key, request.body, {
-    httpMetadata: { contentType: type },
-  });
+  /* Buffered rather than streamed: KV needs the length up front, and 12 MB is
+     well inside a worker's memory budget. */
+  const bytes = await request.arrayBuffer();
+  if (bytes.byteLength > MAX_PHOTO_BYTES) {
+    return json({ error: "Photo too large." }, 413);
+  }
+
+  await env.EDITS.put(key, bytes, { metadata: { contentType: type, name: safe } });
 
   return json({ ok: true, key, url: "/api/photo?key=" + encodeURIComponent(key) });
 }
 
 /** Serve a stored photo back — for the editor's preview and for your download. */
 async function servePhoto(request, env, url) {
-  const missing = requireBucket(env);
+  const missing = requireStore(env);
   if (missing) return missing;
 
   const key = url.searchParams.get("key") || "";
-  if (!key.startsWith("photos/")) return json({ error: "Not found." }, 404);
+  // Also stops a crafted key reading a batch back out as if it were an image.
+  if (!key.startsWith("photo:")) return json({ error: "Not found." }, 404);
 
-  const object = await env.UPLOADS.get(key);
-  if (!object) return json({ error: "Not found." }, 404);
+  const found = await env.EDITS.getWithMetadata(key, { type: "arrayBuffer" });
+  if (!found || !found.value) return json({ error: "Not found." }, 404);
 
-  const headers = new Headers();
-  object.writeHttpMetadata(headers);
-  headers.set("etag", object.httpEtag);
-  // Private by definition — it sits behind the password and must not be cached
-  // by anything between here and the browser.
-  headers.set("Cache-Control", "private, max-age=3600");
-  return new Response(object.body, { headers });
+  return new Response(found.value, {
+    headers: {
+      "Content-Type": (found.metadata && found.metadata.contentType) || "image/webp",
+      // Private by definition — it sits behind the password and must not be
+      // cached by anything between here and the browser.
+      "Cache-Control": "private, max-age=3600",
+    },
+  });
 }
 
 async function receiveBatch(request, env, ctx) {

@@ -65,19 +65,28 @@
 
   <main id="main">
 
-    <!-- HERO: company name title + square placeholder image -->
+    <!-- HERO: company name title + square photo -->
     <section class="hero">
       <div class="container hero__grid">
         <div>
           <h1 class="hero__title">Food Industry<br>Fabrication Ltd.</h1>
           <p class="hero__subheader">
-            This text will be the first thing seen on the website. My suggestion
-is that it should tell Canada Bread or any other ideal client: "I'm who
-you're looking for."
+            This text will be the first thing seen on the website. My suggestion is that it should tell Canada Bread or any other ideal client: "I'm who you're looking for."
           </p>
           <p><a class="btn" href="contact.html">Contact us</a></p>
         </div>
-        <div class="placeholder placeholder--square hero__image">Placeholder image</div>
+        <!-- The first real photo on the site. It replaces the placeholder box
+             entirely — no wrapper, same slot class — and crops rather than
+             stretching (see img.hero__image in css/components.css, which also
+             carries the object-position from the crop he dragged).
+
+             This is the one image that must NOT be lazy: it is the largest
+             thing above the fold, so it is eager with fetchpriority="high"
+             (SITE-SPEC.md § 5). width/height are the file's true pixels; the
+             displayed box is set entirely in CSS, so nothing shifts. -->
+        <img class="hero__image" src="assets/index-hero-image-0731.webp"
+             alt="Test image painting" width="1911" height="2400"
+             fetchpriority="high" decoding="async">
       </div>
     </section>
 

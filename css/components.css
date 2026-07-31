@@ -81,7 +81,23 @@
   font-size: 1.1rem;
   max-width: 46ch;
 }
-.hero__image { width: 100%; }
+/* The square is stated here rather than borrowed from .placeholder--square, so
+   it survives the placeholder box being replaced by a real <img>. */
+.hero__image {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+}
+
+/* The real photo: fill the square and crop the overflow rather than squashing
+   the picture to it — same deal as img.banner below.
+
+   The object-position is HIS crop, dragged in the ?edit toolbar and sent as a
+   pair of percentages (SITE-SPEC.md § 11). It belongs to the current photo, not
+   to the slot: re-crop it here if the photo is ever swapped. */
+img.hero__image {
+  object-fit: cover;
+  object-position: 36% 100%;
+}
 
 @media (max-width: 780px) {
   .hero__grid { grid-template-columns: 1fr; }

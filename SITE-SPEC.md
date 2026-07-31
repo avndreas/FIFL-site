@@ -543,7 +543,12 @@ deliberately rather than by default. Things to weigh at that point:
 - **`loading="lazy"`** on off-screen images, and whether the above-the-fold hero should be
   excluded from it.
 - **Explicit `width`/`height`** so nothing shifts as images arrive (the layout-shift point
-  already noted above).
+  already noted above). **This requires `img { height: auto }`, which is in
+  `css/base.css` immediately under the `img, svg` reset — do not remove it.** The
+  attributes are presentational hints that map to the CSS `width`/`height`
+  properties, so without it the file's own pixel height overrules the layout, and
+  `aspect-ratio` cannot rescue the slot because it is ignored once both axes are
+  definite. A portrait hero photo rendered 2400px tall this way once already.
 - **`<img>` vs. CSS `background-image`.** Note that §5 currently plans for the expertise
   cards to become background images (see the `--color-card-*` note). A CSS background
   cannot be lazy-loaded — there is no attribute for it, and the browser fetches it as soon
@@ -896,9 +901,9 @@ would silently turn every 404 back into a 200.
 
 ## 11. Click-to-edit mode
 
-The client edits his own copy by clicking the words on the real page, and adds his
-own photos by dropping them on a picture box. He gets one link, uses the password
-he already has, installs nothing, and learns nothing.
+The client edits his own copy by clicking the words on the real page, and adds,
+replaces or removes photos by clicking a picture box. He gets one link, uses the
+password he already has, installs nothing, and learns nothing.
 
 ```
 https://fifl-site.pages.dev/?edit      him — edit the site
@@ -917,15 +922,15 @@ safe to hand to someone non-technical without supervision.
 |---|---|
 | [`js/edit.js`](js/edit.js) | The editor. Never referenced by any page — injected at the edge. |
 | [`deploy/_worker.js`](deploy/_worker.js) | Injects it under `?edit`; receives `/api/edits` and `/api/upload`; serves `/api/photo`; renders `/edits`; holds `notify()`. |
-| KV namespace `EDITS` | Where a sent batch lands. |
-| R2 bucket `UPLOADS` | Where a photo lands. |
+| KV namespace `EDITS` | Where a sent batch lands (`edit:` keys) **and** where the photo files themselves live (`photo:`). One store, two prefixes. |
 
-Both bindings are added in the Cloudflare dashboard — see `deploy/README.md`. A
-missing binding degrades that half of edit mode and **never touches the site**.
+The binding is added in the Cloudflare dashboard — see `deploy/README.md`. A
+missing binding degrades edit mode and **never touches the site**.
 
 ```
 typing        ->  localStorage, on HIS machine only
-a photo       ->  R2 immediately, metadata to localStorage
+a photo       ->  KV immediately, metadata to localStorage
+a removal     ->  localStorage. It is an instruction, not a file.
 "Send"        ->  POST /api/edits  ->  KV  ->  /edits  ->  you, by hand  ->  deploy
 ```
 
@@ -981,9 +986,25 @@ is his to control with the Enter key rather than something the editor silently e
 
 A **slot** is any `<img>` or any `.placeholder` inside `<main>`. `.placeholder` is
 the site's own convention for "a picture goes here" (§ 5), which is why targeting
-it needs no annotation and survives a restyle. He clicks a slot to open the
-ordinary file dialog, or drags a file onto it — the click matters, because
-drag-and-drop is not obvious to everyone and is impossible on a tablet.
+it needs no annotation and survives a restyle. He can also drag a file onto a slot,
+but the click is what matters — drag-and-drop is not obvious to everyone and is
+impossible on a tablet.
+
+One rule decides what a click does, so there is one thing to explain:
+
+| Slot | Click |
+|---|---|
+| **Empty** picture box | The ordinary file dialog, straight away. |
+| Has a **picture** in it | A menu: *Change photo*, *Remove photo*, *Close*. |
+
+An empty box is the common case and stays a single click. Anything with a picture
+in it has more than one answer, and **Remove must not be a gesture he can make by
+accident** — hence a menu rather than a second gesture on the element itself.
+
+Dragging *inside* a filled slot still repositions the photo. A press released
+without moving is a tap and opens the menu; five pixels of travel makes it a drag.
+Without that threshold the tremor in an ordinary click would nudge the crop and
+quietly mark it unsent.
 
 #### The crop is never baked
 
@@ -1015,12 +1036,59 @@ nothing arrives sideways, and it yields the exact pixel dimensions to write into
 Even cropping to a third of the frame leaves ~800px, more than any slot in a
 1120px column needs. What ships to `assets/` is what *you* produce from it.
 
+#### Stored in KV, not R2
+
+R2 is the purpose-built place for blobs and this was written against it first.
+It is not used because **switching R2 on requires a payment method** on the
+Cloudflare account, and this site does not need one: a processed photo is ~0.5 MB
+against KV's 25 MB per-value ceiling, and one upload is one write against a
+1,000/day free allowance.
+
+Photos therefore share the `EDITS` namespace under a `photo:` prefix. Nothing
+collides, because `/edits` lists batches with `list({ prefix: "edit:" })` and
+never sees them — and `servePhoto` refuses any key not beginning `photo:`, so a
+crafted URL cannot read a batch back out as if it were an image.
+
+**Move to R2 if the gallery ever holds hundreds of photos**, or if one image
+could approach 25 MB. That is a change to two functions in `deploy/_worker.js`
+and one binding — deliberately not spread any wider.
+
 #### He is asked what the photo is
 
 Once, in the toolbar, right after it uploads. He is the only person who knows the
 thing in the picture is a stainless auger conveyor for a bread line, and that
 answer becomes the `alt` text. Asking at the one moment anyone knows the answer
 beats inventing it later.
+
+#### Removing a photo
+
+*Remove photo* proposes an empty picture box. Like everything else here it is only a
+proposal: the file is untouched, the slot shows what the change would look like, and
+one more click puts it back.
+
+**Removal is layered, and the layers come off one at a time.** If his own upload is
+sitting on top of a photo the site ships, the first *Remove* takes **his** off and
+the original reappears; a second *Remove* then proposes taking that one out too. One
+click wiping both would mean a mis-click on a slot he was only tidying proposes
+deleting a photo he never mentioned, with nothing on screen to say so. Each step is
+visible in the slot the instant it happens.
+
+What reaches you depends on what he was removing:
+
+| What he removed | What you get |
+|---|---|
+| An upload he had **not** sent | Nothing. It never reached you, so the record simply goes. |
+| An upload he **had** sent | A retraction — *do not use this photo* — so the batch already sitting at `/edits` is not left standing. |
+| A photo **the site ships** | A removal — *take this out, put the placeholder back*. |
+
+An `<img>` cannot just be emptied on screen: drop the `src` and the box collapses,
+taking the layout with it. So a slot marked for removal is pointed at a **generated
+SVG of the same intrinsic size**, hatched like `.placeholder` and outlined in red.
+The element, its attributes and its CSS are left alone, which is the only way this
+can be safe on a page whose styling changes often.
+
+A photo he uploads and then removes answers any pending removal of that slot, so the
+two never travel together saying different things.
 
 #### HEIC
 
@@ -1032,10 +1100,11 @@ Cloudflare Images (paid) or a WASM decoder (a dependency); neither fits.
 
 #### One accepted cost
 
-A photo he uploads and then discards leaves an orphan object in R2. That is the
-price of uploading on drop rather than on Send. It is invisible — only photos
-named by a submitted batch are ever shown at `/edits` — and it is a few hundred
-KB against a 10 GB free tier.
+A photo he uploads and then discards or removes leaves an orphan object in KV. That
+is the price of uploading on drop rather than on Send. It is invisible — only photos
+named by a submitted batch are ever shown at `/edits` — and it is a few hundred KB.
+Deleting them would mean an endpoint that erases stored files on request, which is a
+strictly worse trade than a handful of stray values.
 
 ### What a batch looks like to you
 
@@ -1054,6 +1123,22 @@ Everything needed to write the `<img>` without opening the file — the name it
 downloads under, the dimensions for `width`/`height`, the `object-position` you
 would otherwise have had to guess, and his own words for the `alt`. The image
 files come down separately via *Download all photos*, named to match.
+
+A removal is the same shape — what goes, and what should be there instead:
+
+```
+[Hero]  img.hero__image
+  REMOVE:       assets/index-hero-image-0731.webp
+  INSTEAD:      put the picture placeholder back
+
+[Our work]  div.placeholder
+  REMOVE:       gallery-01-0731.webp   (a photo he sent earlier — never on the site)
+  INSTEAD:      leave the picture placeholder as it is
+```
+
+The parenthesis is the whole difference between the two rows: the first names a file
+in `assets/` and is a change to the markup, the second names one of his uploads and
+means *ignore the batch further up this page.*
 
 Operational detail — the order to do things in, and the two traps when pasting
 copy back — is in [`deploy/README.md`](deploy/README.md), next to the rest of the
@@ -1078,8 +1163,20 @@ an edit stays attached through a restructure that a selector alone would not sur
 the slot is gone and the batch was already sent, you almost certainly replaced the
 `.placeholder` with a real `<img>` — so the record is dropped. If the slot is gone
 and it was *not* sent, that is a layout change and the record is kept and reported.
-Either way the file itself is safe in R2; this only decides what his browser keeps
+Either way the file itself is safe in KV; this only decides what his browser keeps
 showing him.
+
+**Removals split, because only one of the two kinds is about the page at all.**
+
+- A removal of a photo the site ships is checked against the file it named. Once the
+  slot has stopped showing it — you swapped the `src`, or you put the `.placeholder`
+  back and the selector stopped matching — the proposal has been honoured and the
+  record is dropped. Unlike a photo record this does not care whether it was sent:
+  a removal whose target has already gone has got what it asked for, and reporting
+  it as "no longer matches the page" would be noise.
+- A retraction is a statement about a batch you already have, not about the page —
+  the page is already showing what he wants. There is nothing to check it against
+  and nothing to redraw, so it simply lives until it has been sent, then goes.
 
 ### Deliberate behaviours worth knowing
 
@@ -1111,6 +1208,11 @@ divergence § 9 warns about). Commands in § 12.
 
 Worth checking after a layout change: open `?edit`, confirm the new or moved copy has
 a dashed outline, and confirm the header and footer do **not**.
+
+Worth checking after touching a picture slot: click it, *Remove photo*, and confirm
+the box keeps its exact size and position on the page. A slot whose height comes from
+the image file rather than from CSS will collapse — which is the same trap as
+`img { height: auto }` in § 5, showing up somewhere new.
 
 ---
 
@@ -1162,8 +1264,7 @@ Everything else is per-Cloudflare-account, and the full runbook with explanation
 | `npx wrangler@4.115.0 login` | Authorise wrangler in a browser. |
 | `npx wrangler@4.115.0 pages project create fifl-site --production-branch=master` | Create the Pages project. |
 | `npx wrangler@4.115.0 pages secret put PREVIEW_PASSWORD --project-name=fifl-site` | Set the preview password. Repeat to change it. |
-| `npx wrangler@4.115.0 kv namespace create fifl-edits` | Create the store for client edits. Then bind it as **`EDITS`** in the dashboard. |
-| `npx wrangler@4.115.0 r2 bucket create fifl-uploads` | Create the store for client photos. Then bind it as **`UPLOADS`** in the dashboard. |
+| `npx wrangler@4.115.0 kv namespace create fifl-edits` | Create the store for client edits **and** photos. Then bind it as **`EDITS`** in the dashboard. One namespace covers both (§ 11). |
 
 > **Keep the version pinned exactly.** `wrangler@4` is a semver range, which npm
 > cannot resolve without a network round trip on every single invocation (§ 9). To
@@ -1177,12 +1278,12 @@ the 404 status, or edit mode. For those:
 ```
 echo PREVIEW_PASSWORD=whatever > .dev.vars     # gitignored; delete when done
 npm run build
-npx wrangler@4.115.0 pages dev dist --kv EDITS --r2 UPLOADS --compatibility-date=2026-07-29
+npx wrangler@4.115.0 pages dev dist --kv EDITS --compatibility-date=2026-07-29
 ```
 
-`--kv EDITS` and `--r2 UPLOADS` give you throwaway local stores under
-`.wrangler/` — nothing touches Cloudflare. Then visit `http://localhost:8788/`
-plus `?edit`, and `/edits`.
+`--kv EDITS` gives you a throwaway local store under `.wrangler/`, for batches
+and photos alike — nothing touches Cloudflare. Then visit
+`http://localhost:8788/` plus `?edit`, and `/edits`.
 
 **If a restart seems to change nothing, look for an orphaned `workerd`.** Ctrl+C
 does not always take wrangler's runtime down with it, and the survivor keeps the

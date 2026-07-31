@@ -7,9 +7,9 @@
    promise in SITE-SPEC § 2 is untouched.
 
    What it is for: the client edits his own copy by clicking the words on the
-   real page, and adds his own photos by dropping them on an image slot, rather
-   than describing either in an email. Nothing he does reaches a file. Every
-   change is a PROPOSAL — see § 11 of SITE-SPEC.md.
+   real page, and adds, replaces or removes photos by clicking a picture box,
+   rather than describing any of it in an email. Nothing he does reaches a file.
+   Every change is a PROPOSAL — see § 11 of SITE-SPEC.md.
 
    ---------------------------------------------------------------------------
    THE ONE DESIGN RULE: NO ANNOTATIONS IN THE MARKUP.
@@ -31,7 +31,8 @@
    WHERE THINGS GO
    ---------------------------------------------------------------------------
        typing        ->  localStorage, on HIS machine only
-       a photo       ->  R2 immediately (see uploadPhoto), metadata to localStorage
+       a photo       ->  KV immediately (see uploadPhoto), metadata to localStorage
+       a removal     ->  localStorage. It is an instruction, not a file.
        "Send"        ->  POST /api/edits  ->  KV  ->  /edits (you)
 
    Text never leaves the browser until Send. A PHOTO does — it uploads the
@@ -73,9 +74,12 @@
   // storage
   // -------------------------------------------------------------------------
 
-  /* One flat map, keyed by page + kind + selector, holding both kinds of
-     record. `kind` is "text" or "photo"; everything that treats them
-     differently branches on it explicitly. */
+  /* One flat map, keyed by page + kind + selector. `kind` is "text", "photo" or
+     "remove"; everything that treats them differently branches on it explicitly.
+
+     Because the kind is part of the key, one slot can hold a "photo" record and
+     a "remove" record without them colliding — though in practice it never
+     holds both, because each one deletes the other (see attachSlot). */
   function load() {
     try {
       return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
@@ -229,7 +233,38 @@
   function discoverSlots() {
     var main = mainEl();
     if (!main) return [];
-    return Array.prototype.slice.call(main.querySelectorAll("img, .placeholder"));
+    var slots = Array.prototype.slice.call(main.querySelectorAll("img, .placeholder"));
+    for (var i = 0; i < slots.length; i++) snapshotSlot(slots[i]);
+    return slots;
+  }
+
+  /* What a slot is showing RIGHT NOW: an <img>'s src, or the url() of a CSS
+     background for anything else. Returns "" for a slot with no picture in it —
+     note that .placeholder's diagonal hatch is a gradient, not a url(), so an
+     empty placeholder correctly reads as empty. */
+  function currentSrc(el) {
+    if (el.tagName === "IMG") return el.getAttribute("src") || "";
+    var bg = window.getComputedStyle(el).backgroundImage;
+    var m = bg && bg !== "none" ? bg.match(/url\(["']?([^"')]+)["']?\)/) : null;
+    return m ? m[1] : "";
+  }
+
+  /* Record what the PAGE has in this slot, before anything in here paints over
+     it. That one string is what makes removal possible at all: it is how we
+     tell "a photo the site actually ships" from "a photo he added a moment ago"
+     — the two need opposite treatment — and it is what a slot is restored to
+     when he changes his mind.
+
+     Must run before reconcile(), which is why it lives in discovery. Read after
+     a paint it would return the paint. */
+  function snapshotSlot(el) {
+    if (!el.hasAttribute("data-fifl-original")) {
+      el.setAttribute("data-fifl-original", currentSrc(el));
+    }
+  }
+
+  function originalOf(el) {
+    return el.getAttribute("data-fifl-original") || "";
   }
 
   /* A filename stem that tells you where the photo belongs when it lands in
@@ -323,8 +358,8 @@
      localStorage, and a failure at the moment he picks the file is far easier
      to understand than one buried in a batch ten minutes later.
 
-     A photo he later discards leaves an orphan object in R2. That is the
-     accepted cost of this ordering — it is invisible (only photos named by a
+     A photo he later discards or removes leaves an orphan object in KV. That is
+     the accepted cost of this ordering — it is invisible (only photos named by a
      submitted batch are ever shown at /edits) and it is a few hundred KB. */
   function uploadPhoto(name, type, blob) {
     return fetch("/api/upload", {
@@ -332,8 +367,24 @@
       headers: { "Content-Type": type, "X-Photo-Name": name },
       body: blob,
     }).then(function (res) {
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      return res.json();
+      if (res.ok) return res.json();
+
+      /* Carry the server's reason back to the caller. Collapsing every failure
+         into one message once cost an afternoon: photo storage was not
+         configured at all, the worker said so plainly in its 503, and the
+         editor replaced that with "try again" — advice that could never work
+         and hid the actual cause. */
+      var err = new Error("HTTP " + res.status);
+      err.status = res.status;
+      return res.json().then(
+        function (body) {
+          if (body && body.error) err.detail = body.error;
+          throw err;
+        },
+        function () {
+          throw err;
+        }
+      );
     });
   }
 
@@ -355,53 +406,145 @@
       el.style.backgroundPosition = position;
       el.style.color = "transparent"; // hide the "Placeholder image" label
     }
+    el.removeAttribute("data-fifl-gone");
     el.setAttribute("data-fifl-changed", "");
   }
 
-  /* Drag inside a filled slot to reposition. This only ever produces a pair of
-     percentages — no zoom, no crop box, nothing destructive. */
-  function makeDraggable(el, rec, store, onChange) {
+  /* Put the slot back exactly as the page had it. Every property paintSlot and
+     blankSlot can set is cleared here, and the <img> gets its own src back from
+     the snapshot — so undoing an upload reveals whatever was underneath rather
+     than leaving his photo stranded. */
+  function unpaintSlot(el) {
+    var original = originalOf(el);
+    if (el.tagName === "IMG") {
+      el.style.objectFit = "";
+      el.style.objectPosition = "";
+      if (original) el.setAttribute("src", original);
+    } else {
+      el.style.backgroundImage = "";
+      el.style.backgroundSize = "";
+      el.style.backgroundPosition = "";
+      el.style.color = "";
+    }
+    el.removeAttribute("data-fifl-changed");
+    el.removeAttribute("data-fifl-gone");
+  }
+
+  /* Show a slot as it would look with the photo taken out: an empty picture box.
+     This is the PREVIEW of a proposal, not a change — the file is untouched and
+     the record can be undone with one click.
+
+     For anything with a CSS background, clearing it inline is enough. An <img>
+     cannot simply be emptied — remove the src and the box collapses, taking the
+     layout with it — so it is pointed at a generated SVG of the same intrinsic
+     size instead. The element, its attributes and its CSS are all left alone,
+     which is the only way this can be safe on a page whose styling changes. */
+  function blankSlot(el) {
+    if (el.tagName === "IMG") {
+      el.style.objectFit = "";
+      el.style.objectPosition = "";
+      el.setAttribute("src", emptyBox(el));
+    } else {
+      el.style.backgroundImage = "none";
+      el.style.color = "";
+    }
+    el.removeAttribute("data-fifl-changed");
+    el.setAttribute("data-fifl-gone", "");
+  }
+
+  /* A hatched grey box as a data: URI, sized from the <img>'s own width/height
+     attributes so the intrinsic ratio — and therefore the layout — is unchanged
+     (SITE-SPEC § 5). Deliberately echoes the diagonal hatch of .placeholder in
+     components.css, because that is exactly what it stands for. */
+  function emptyBox(el) {
+    var box = el.getBoundingClientRect();
+    var w = Number(el.getAttribute("width")) || Math.round(box.width) || 400;
+    var h = Number(el.getAttribute("height")) || Math.round(box.height) || 300;
+    var step = Math.max(6, Math.round(Math.max(w, h) / 60));
+    var svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">' +
+      '<defs><pattern id="h" width="' + step * 2 + '" height="' + step * 2 + '" ' +
+      'patternTransform="rotate(45)" patternUnits="userSpaceOnUse">' +
+      '<rect width="' + step * 2 + '" height="' + step * 2 + '" fill="#f2f3f6"/>' +
+      '<rect width="' + step + '" height="' + step * 2 + '" fill="#e3e6ec"/>' +
+      "</pattern></defs>" +
+      '<rect width="100%" height="100%" fill="url(#h)"/></svg>';
+    // encodeURIComponent, not a raw string: the "#" of url(#h) would otherwise
+    // end the data URI and the pattern would silently not apply.
+    return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  }
+
+  /* Drag inside a filled slot to reposition; release without moving to open the
+     slot menu. Repositioning only ever produces a pair of percentages — no zoom,
+     no crop box, nothing destructive.
+
+     The record is looked up through getRec() on every gesture rather than
+     captured once. That is what lets a slot be filled, emptied and refilled
+     without ever re-binding these listeners — and it means a deleted record can
+     never be resurrected by a stray drag on a slot that no longer has a photo. */
+  function makeDraggable(el, getRec, store, onChange, onTap) {
+    var rec = null;
     var dragging = false;
+    var moved = false;
     var startX = 0;
     var startY = 0;
     var startPos = [50, 50];
 
-    function parsePos() {
-      var m = String(rec.position || "50% 50%").match(/(-?[\d.]+)%\s+(-?[\d.]+)%/);
+    function parsePos(r) {
+      var m = String(r.position || "50% 50%").match(/(-?[\d.]+)%\s+(-?[\d.]+)%/);
       return m ? [parseFloat(m[1]), parseFloat(m[2])] : [50, 50];
     }
 
     el.addEventListener("pointerdown", function (ev) {
-      if (!rec.file) return;
+      rec = getRec();
+      // No photo of his in this slot: nothing to slide, so leave the gesture
+      // alone and let the ordinary click handler open the menu or the picker.
+      if (!rec) return;
       dragging = true;
+      moved = false;
       startX = ev.clientX;
       startY = ev.clientY;
-      startPos = parsePos();
+      startPos = parsePos(rec);
       el.setPointerCapture(ev.pointerId);
       ev.preventDefault();
     });
 
     el.addEventListener("pointermove", function (ev) {
-      if (!dragging) return;
+      if (!dragging || !rec) return;
+      var dx = ev.clientX - startX;
+      var dy = ev.clientY - startY;
+      // Under a few pixels this is still a tap. Without the threshold, the hand
+      // tremor in any real click would nudge the crop and mark it unsent.
+      if (!moved && Math.abs(dx) + Math.abs(dy) < 5) return;
+      moved = true;
       var box = el.getBoundingClientRect();
       // Inverted: dragging the image right should reveal what is on its left.
-      var x = startPos[0] - ((ev.clientX - startX) / box.width) * 100;
-      var y = startPos[1] - ((ev.clientY - startY) / box.height) * 100;
+      var x = startPos[0] - (dx / box.width) * 100;
+      var y = startPos[1] - (dy / box.height) * 100;
       x = Math.max(0, Math.min(100, x));
       y = Math.max(0, Math.min(100, y));
       rec.position = Math.round(x) + "% " + Math.round(y) + "%";
       paintSlot(el, rec.url, rec.position);
     });
 
-    function end() {
+    el.addEventListener("pointerup", function () {
       if (!dragging) return;
       dragging = false;
-      rec.sent = false; // repositioned since the last submission
-      save(store);
-      onChange();
-    }
-    el.addEventListener("pointerup", end);
-    el.addEventListener("pointercancel", end);
+      if (!moved) {
+        onTap();
+        return;
+      }
+      if (rec) {
+        rec.sent = false; // repositioned since the last submission
+        save(store);
+        onChange();
+      }
+    });
+
+    // A cancelled gesture is not a tap and not a drag. Drop it silently.
+    el.addEventListener("pointercancel", function () {
+      dragging = false;
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -435,11 +578,43 @@
         el = null; // selector no longer parses
       }
 
+      if (rec.kind === "remove") {
+        /* A RETRACTION ("ignore the photo I sent for that slot") is a statement
+           about a batch you already have, not about the page — the page is
+           already showing what he wants. There is nothing to check it against
+           and nothing to redraw, so it simply lives until it has been sent. */
+        if (!rec.onSite) {
+          if (rec.sent) {
+            delete store[key];
+            dirty = true;
+          }
+          continue;
+        }
+
+        /* A removal of a photo that IS in the markup follows the same three
+           cases as everything else, checked against the file it named. Applied
+           means the slot has stopped showing it — either you swapped the src,
+           or you put the .placeholder back and the selector stopped matching at
+           all. Both mean the proposal has been honoured; drop it.
+
+           Unlike a photo record this does not distinguish sent from unsent. A
+           removal whose target has already gone has got what it asked for, and
+           re-reporting it as "no longer matches the page" would be noise. */
+        if (!el || currentSrc(el) !== rec.was) {
+          delete store[key];
+          dirty = true;
+          continue;
+        }
+        rec.stale = false;
+        blankSlot(el);
+        continue;
+      }
+
       if (rec.kind === "photo") {
         /* A slot that has vanished after the batch was sent almost always means
            you placed the photo and replaced the placeholder with a real <img>.
            Drop it. Unsent, the same disappearance is a layout change and the
-           record is kept so it can still be reported. The FILE is safe in R2
+           record is kept so it can still be reported. The FILE is safe in KV
            either way — this only decides what his browser keeps showing. */
         if (!el) {
           if (rec.sent) {
@@ -585,8 +760,20 @@
   function attachSlot(el, allSlots, store, onChange, ui) {
     el.setAttribute(SLOT, "");
 
-    var key = pageName() + "|photo|" + selectorFor(el);
+    var sel = selectorFor(el);
+    var key = pageName() + "|photo|" + sel;
+    var goneKey = pageName() + "|remove|" + sel;
     var stem = slotStem(el, allSlots);
+
+    /** His photo in this slot, if there is one. */
+    function photo() {
+      return store[key] && store[key].file ? store[key] : null;
+    }
+
+    /** A pending removal for this slot, if there is one. */
+    function removal() {
+      return store[goneKey] || null;
+    }
 
     /* Click opens a file picker as well as accepting a drop. Drag-and-drop is
        not obvious to everyone and is impossible on a tablet; a click that opens
@@ -602,10 +789,146 @@
       picker.value = "";
     });
 
+    /* ONE rule for what a click does, so there is one thing to explain:
+
+         empty box   ->  the file dialog, straight away.
+         has a photo ->  a menu, because there is now more than one answer.
+
+       An empty box is the common case and must stay a single click. Anything
+       with a picture in it has to offer Remove, and Remove cannot be a gesture
+       he might make by accident — hence the menu rather than a second gesture
+       on the element itself.
+
+       Note this covers photos the SITE ships as well as photos he added. Before
+       this, an <img> that was already on the page could be replaced but never
+       taken out, which is the gap the menu closes. */
+    var lastTap = 0;
+
+    function activate() {
+      /* Both the pointer handler (tap-to-open) and the click handler can arrive
+         for one press, depending on how the browser treats preventDefault on
+         pointerdown. Opening twice is harmless but the toolbar row visibly
+         flickers, so collapse the pair. */
+      var now = Date.now();
+      if (now - lastTap < 350) return;
+      lastTap = now;
+
+      var pending = removal();
+      if (pending && pending.onSite) {
+        menuRemoved();
+      } else if (photo() || originalOf(el)) {
+        menuFilled();
+      } else {
+        picker.click();
+      }
+    }
+
+    function menuFilled() {
+      ui.openSlot(photo() ? "Your photo" : "This picture", [
+        {
+          text: "Change photo",
+          kind: "primary",
+          run: function () {
+            ui.closeSlot();
+            picker.click();
+          },
+        },
+        { text: "Remove photo", kind: "danger", run: removePhoto },
+      ]);
+    }
+
+    function menuRemoved() {
+      ui.openSlot("Marked for removal", [
+        { text: "Put it back", kind: "primary", run: undoRemoval },
+        {
+          text: "Choose a photo",
+          kind: "ghost",
+          run: function () {
+            ui.closeSlot();
+            picker.click();
+          },
+        },
+      ]);
+    }
+
+    /* Removal is deliberately layered rather than absolute, and the layers come
+       off one at a time. If his own photo is sitting on top of one the site
+       ships, the first Remove takes HIS off and the original reappears; a second
+       Remove then proposes taking that out too.
+
+       That ordering is what makes the button safe. The alternative — one click
+       wiping both — means a mis-click on a slot he was only tidying proposes
+       deleting a photo he never mentioned, and he would have no way of knowing
+       it had happened. Each step is visible in the slot the instant it happens. */
+    function removePhoto() {
+      var mine = photo();
+      var onPage = originalOf(el);
+
+      if (mine) {
+        var wasSent = mine.sent;
+        delete store[key];
+        unpaintSlot(el);
+
+        /* If it never reached you there is nothing to say about it — the record
+           just goes, and no proposal is made. If it DID, deleting quietly would
+           leave the batch sitting at /edits telling you to place a photo he has
+           since changed his mind about, so a retraction takes its place. */
+        if (wasSent) {
+          store[goneKey] = removalRecord(mine.name, false, onPage);
+          ui.say("Removed — Andreas will be told to ignore it.", "ok");
+        } else {
+          ui.say(onPage ? "Your photo removed — the original is back." : "Photo removed.", "ok");
+        }
+      } else if (onPage) {
+        /* Overwrites any retraction already sitting here, and should: "this box
+           should be empty" says everything the retraction did and more. */
+        store[goneKey] = removalRecord(onPage, true, "");
+        blankSlot(el);
+        ui.say("Marked for removal — press Send changes when you are done.", "ok");
+      }
+
+      save(store);
+      ui.closeSlot();
+      onChange();
+    }
+
+    function undoRemoval() {
+      delete store[goneKey];
+      unpaintSlot(el);
+      save(store);
+      ui.closeSlot();
+      ui.say("Put back.", "ok");
+      onChange();
+    }
+
+    /**
+     * @param was    the photo going: a src the site ships, or the name of one he
+     *               uploaded.
+     * @param onSite true if `was` is in this repo's markup. False means he is
+     *               retracting something he sent, and there is nothing on the
+     *               page to reconcile it against — see reconcile().
+     * @param back   what should be showing instead. "" is the picture placeholder.
+     */
+    function removalRecord(was, onSite, back) {
+      return {
+        kind: "remove",
+        page: pageName(),
+        selector: sel,
+        section: sectionFor(el),
+        tag: tagAndClasses(el),
+        slot: stem,
+        was: was,
+        onSite: onSite,
+        back: back,
+        ts: new Date().toISOString(),
+        sent: false,
+        stale: false,
+      };
+    }
+
     el.addEventListener("click", function (ev) {
-      if (store[key] && store[key].file) return; // filled: clicks reposition
       ev.preventDefault();
-      picker.click();
+      activate();
     });
 
     el.addEventListener("dragover", function (ev) {
@@ -666,10 +989,15 @@
             stale: false,
           };
           store[key] = rec;
+
+          /* A photo in the slot answers any pending removal of it, so the two
+             never travel together saying different things. Safe even when the
+             removal was already sent: this proposal is for the same slot, so
+             whichever way you read it, the photo is what he wants there now. */
+          delete store[goneKey];
           save(store);
 
           paintSlot(el, rec.url, rec.position);
-          makeDraggable(el, rec, store, onChange);
           onChange();
 
           if (done.out.raw) {
@@ -677,15 +1005,26 @@
           }
           ui.askDescription(rec, store, onChange);
         })
-        .catch(function () {
-          ui.say("Could not add that photo — try again.", "bad");
+        .catch(function (err) {
+          /* Distinguish "this will never work" from "this might". A 503 means
+             photo storage is not configured, and telling him to try again would
+             send him round a loop with no exit. The technical detail goes to the
+             console for you, not to him. */
+          if (err && err.detail) console.log("upload failed: " + err.detail);
+          ui.say(
+            err && err.status === 503
+              ? "Photo uploads are not switched on yet — let Andreas know."
+              : "Could not add that photo — try again.",
+            "bad"
+          );
         });
     }
 
-    // Already-filled slots get their drag behaviour back after a reload.
-    if (store[key] && store[key].file) {
-      makeDraggable(el, store[key], store, onChange);
-    }
+    /* Bound once, for every slot, filled or not — it reads the store on each
+       gesture. Binding it only for slots that happen to have a photo at load
+       used to mean a second upload into the same slot bound a SECOND set of
+       listeners, and both then fought over the crop. */
+    makeDraggable(el, photo, store, onChange, activate);
   }
 
   function stamp() {
@@ -711,6 +1050,10 @@
       "[" + SLOT + "][data-fifl-changed]{cursor:move;outline-color:#00b37e;}",
       "[data-fifl-changed]{outline-color:#00b37e !important;}",
       "[data-fifl-changed]:focus{outline:2px solid #00b37e;background:#00b37e1f;}",
+      /* Marked for removal. Red rather than the green of an addition, and last
+         in the list so it wins on equal specificity — a blanked slot must never
+         read as an empty one he simply has not filled in yet. */
+      "[" + SLOT + "][data-fifl-gone]{outline:2px dashed #ff6b6b;cursor:pointer;}",
       "body{padding-bottom:" + (BAR_HEIGHT + 16) + "px;}",
     ].join("\n");
     document.head.appendChild(css);
@@ -750,18 +1093,30 @@
       ".bad{color:#ff6b6b;}" +
       "input{font:inherit;flex:1;min-width:0;padding:10px 12px;border:1px solid #3a3f4b;" +
       "background:#0f1115;color:#f2f4f8;border-radius:2px;min-height:44px;}" +
-      ".ask{display:none;align-items:center;gap:12px;padding:0 16px;height:" +
+      ".ask,.pick{display:none;align-items:center;gap:12px;padding:0 16px;height:" +
       BAR_HEIGHT + "px;background:#0f1115;color:#f2f4f8;" +
       "border-top:2px solid #00a3c4;box-sizing:border-box;}" +
-      ".ask.on{display:flex}" +
+      ".ask.on,.pick.on{display:flex}" +
       ".ask span{flex:none;color:#9aa3b2}" +
+      // The slot menu's label yields all its width to the buttons before they
+      // would wrap — on a phone it disappears entirely, which is no loss: he is
+      // looking at the box he just tapped.
+      ".what{flex:1;min-width:0;color:#9aa3b2;overflow:hidden;" +
+      "text-overflow:ellipsis;white-space:nowrap}" +
+      ".acts{display:flex;gap:8px;flex:none}" +
+      ".primary{background:#7c5cff;color:#fff;}" +
+      ".danger{background:#3a1f24;color:#ff9b9b;}" +
       "@media (max-width:640px){.label{display:none}button{padding:10px 12px}" +
-      ".ask span{display:none}}" +
+      ".ask span,.what{display:none}}" +
       "</style>" +
       '<div class="ask" id="ask">' +
       "<span>What is this a photo of?</span>" +
       '<input id="desc" type="text" placeholder="e.g. Stainless auger conveyor for a bread line">' +
       '<button class="send" id="descok" type="button">Done</button>' +
+      "</div>" +
+      '<div class="pick" id="pick">' +
+      '<span class="what" id="what"></span>' +
+      '<span class="acts" id="acts"></span>' +
       "</div>" +
       '<div class="bar">' +
       '<span class="dot"></span>' +
@@ -778,6 +1133,24 @@
     var askEl = root.getElementById("ask");
     var descEl = root.getElementById("desc");
     var okEl = root.getElementById("descok");
+    var pickEl = root.getElementById("pick");
+    var whatEl = root.getElementById("what");
+    var actsEl = root.getElementById("acts");
+
+    /* At most one extra row is ever open, and the page's bottom padding tracks
+       it, so nothing the toolbar does can bury the last paragraph on the page. */
+    function showRow(row) {
+      askEl.classList.remove("on");
+      pickEl.classList.remove("on");
+      row.classList.add("on");
+      document.body.style.paddingBottom = BAR_HEIGHT * 2 + 16 + "px";
+    }
+
+    function hideRows() {
+      askEl.classList.remove("on");
+      pickEl.classList.remove("on");
+      document.body.style.paddingBottom = BAR_HEIGHT + 16 + "px";
+    }
 
     var ui = {
       count: root.getElementById("count"),
@@ -791,23 +1164,46 @@
          one who can say what the part is; inventing it later is guesswork. */
       askDescription: function (rec, store, onChange) {
         descEl.value = rec.description || "";
-        askEl.classList.add("on");
-        document.body.style.paddingBottom = BAR_HEIGHT * 2 + 16 + "px";
+        showRow(askEl);
         descEl.focus();
 
         okEl.onclick = function () {
           rec.description = descEl.value.trim();
           rec.sent = false;
           save(store);
-          askEl.classList.remove("on");
-          document.body.style.paddingBottom = BAR_HEIGHT + 16 + "px";
-          ui.say(rec.description ? "Photo added" : "Photo added", "ok");
+          hideRows();
+          ui.say("Photo added", "ok");
           onChange();
         };
         descEl.onkeydown = function (ev) {
           if (ev.key === "Enter") okEl.onclick();
         };
       },
+
+      /* The menu for a slot that already has a picture in it. The buttons are
+         rebuilt on every open rather than hidden and re-labelled, because what
+         a slot offers depends on what is in it — and a stale handler left on a
+         re-labelled button is the kind of bug that removes the wrong photo.
+         Close is appended here so no caller can forget it and strand him. */
+      openSlot: function (label, actions) {
+        whatEl.textContent = label;
+        while (actsEl.firstChild) actsEl.removeChild(actsEl.firstChild);
+
+        actions.concat([{ text: "Close", kind: "ghost", run: hideRows }]).forEach(
+          function (action) {
+            var button = document.createElement("button");
+            button.type = "button";
+            button.className = action.kind;
+            button.textContent = action.text;
+            button.addEventListener("click", action.run);
+            actsEl.appendChild(button);
+          }
+        );
+
+        showRow(pickEl);
+      },
+
+      closeSlot: hideRows,
     };
     return ui;
   }
@@ -882,7 +1278,10 @@
       var photos = all.filter(function (e) {
         return e.kind === "photo";
       }).length;
-      var words = all.length - photos;
+      var gone = all.filter(function (e) {
+        return e.kind === "remove";
+      }).length;
+      var words = all.length - photos - gone;
       var pages = {};
       all.forEach(function (e) {
         pages[e.page] = 1;
@@ -891,9 +1290,10 @@
       var parts = [];
       if (words) parts.push("<b>" + words + "</b> text change" + (words === 1 ? "" : "s"));
       if (photos) parts.push("<b>" + photos + "</b> photo" + (photos === 1 ? "" : "s"));
+      if (gone) parts.push("<b>" + gone + "</b> removed");
 
       var text = all.length === 0
-        ? "Click any text to edit it, or any picture box to add a photo."
+        ? "Click any text to edit it, or any picture box to add, change or remove a photo."
         : parts.join(" · ") +
           " on " + Object.keys(pages).length + " page" +
           (Object.keys(pages).length === 1 ? "" : "s") +

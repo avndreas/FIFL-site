@@ -53,9 +53,9 @@ npx wrangler@4.115.0 pages secret put PREVIEW_PASSWORD --project-name=fifl-site
 Paste the password when prompted. The username is `fifl` unless you also set a
 `PREVIEW_USER` secret the same way.
 
-**4. Create the store for client edits.** This is what edit mode writes into
-(see *Letting the client edit the site*, below). Skip it and the site works
-perfectly — only `/edits` reports that it has nowhere to put anything.
+**4. Create the store for client edits and photos.** This is what edit mode
+writes into (see *Letting the client edit the site*, below). Skip it and the site
+works perfectly — only `/edits` reports that it has nowhere to put anything.
 
 ```
 npx wrangler@4.115.0 kv namespace create fifl-edits
@@ -67,21 +67,17 @@ with the variable name **`EDITS`** and that namespace selected. Pages Direct
 Upload projects take bindings from the dashboard, not from a config file, which
 is why this step is clicks rather than a command.
 
-**5. Create the store for client photos.** Same shape as step 4. Skip it and text
-editing still works perfectly — only the photo half reports that it has nowhere
-to put anything.
+**One namespace holds both** the submitted batches (keys beginning `edit:`) and
+the photo files themselves (`photo:`). There is nothing else to create.
 
-```
-npx wrangler@4.115.0 r2 bucket create fifl-uploads
-```
+> **Why not R2, which is the proper place for image files?** Because switching R2
+> on requires a payment method on the Cloudflare account, and this site does not
+> need one. A processed photo is ~0.5 MB against KV's 25 MB per-value ceiling,
+> and one upload is one write against a 1,000/day free allowance — orders of
+> magnitude of headroom. Move to R2 if the gallery ever holds hundreds of photos;
+> it is a change to two functions in `_worker.js` and one binding.
 
-Bind it in the dashboard the same way — **Settings → Bindings → Add → R2
-bucket** — with the variable name **`UPLOADS`**.
-
-R2 rather than KV because KV is a key-value store for small values, not a place
-to put half-megabyte images. The free tier covers this site many times over.
-
-**6. Deploy.**
+**5. Deploy.**
 
 ```
 npm run deploy
@@ -177,10 +173,16 @@ interface.
 
 - **Text** — every paragraph and heading gets a dashed violet outline. He clicks
   one and types.
-- **Photos** — every picture box gets a dashed blue outline. He clicks it to pick
-  a file, or drags one onto it. Once filled, he can drag *inside* the box to
-  slide the photo around until the right part shows. He is asked, once, what the
-  photo is of — that becomes the `alt` text.
+- **Photos** — every picture box gets a dashed blue outline. Clicking an **empty**
+  one opens the file dialog; he can drag a file onto it instead. Once filled, he
+  can drag *inside* the box to slide the photo around until the right part shows.
+  He is asked, once, what the photo is of — that becomes the `alt` text.
+- **Changing or removing a photo** — clicking a box that already has a picture in
+  it opens a small menu instead of the file dialog: *Change photo*, *Remove photo*.
+  A removed box turns into a red-outlined empty one, and clicking it again offers
+  *Put it back*. If his own photo was sitting on top of one the site ships, the
+  first *Remove* takes his off and the original reappears — a second one then
+  proposes removing that too.
 
 A bar along the bottom counts his changes and carries the **Send changes**
 button. Moving between pages via the nav keeps him in edit mode.
@@ -204,6 +206,14 @@ https://fifl-site.pages.dev/edits
 Same password. Each submission is listed newest first, grouped by page: text as
 before/after pairs, photos as a thumbnail with the filename, dimensions, his
 chosen `object-position` and his description.
+
+A **removal** appears as a red block naming the photo that goes and what should be
+there instead. Read the note under the filename, because it decides what you do:
+
+| The block says | What it means |
+|---|---|
+| *Take this photo out* | The file it names is in `assets/` and on the page. Replace the `<img>` with the `.placeholder` markup it had before, or with whatever the slot should show now. |
+| *Do not use this photo* — *a photo he sent earlier, never on the site* | He has changed his mind about an upload from an earlier batch further up this page. Nothing to edit; just do not place it. |
 
 - **Copy all as text** puts the whole batch on the clipboard — text edits *and*
   a description of each photo — in a form you can paste straight into an editor,
@@ -258,14 +268,14 @@ To run the site exactly as Cloudflare will, password and all:
 ```
 echo PREVIEW_PASSWORD=whatever > .dev.vars
 npm run build
-npx wrangler@4.115.0 pages dev dist --kv EDITS --r2 UPLOADS --compatibility-date=2026-07-29
+npx wrangler@4.115.0 pages dev dist --kv EDITS --compatibility-date=2026-07-29
 ```
 
 `.dev.vars` is gitignored. Delete it when you are done.
 
-`--kv EDITS` and `--r2 UPLOADS` give edit mode throwaway local stores on disk
-under `.wrangler/`. They never touch Cloudflare and the real namespace and bucket
-are not involved, so you can post test batches and upload test photos freely.
+`--kv EDITS` gives edit mode a throwaway local store on disk under `.wrangler/`,
+for both batches and photos. It never touches Cloudflare and the real namespace
+is not involved, so you can post test batches and upload test photos freely.
 
 Then open `http://localhost:8788/?edit` and `http://localhost:8788/edits`.
 

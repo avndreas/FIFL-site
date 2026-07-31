@@ -23,6 +23,23 @@ body {
 img,
 svg { max-width: 100%; display: block; }
 
+/* Not optional, and not cosmetic. Every <img> on this site carries width and
+   height ATTRIBUTES so the browser reserves the right box before the file
+   arrives (SITE-SPEC § 5). Those attributes are presentational hints — they map
+   to the CSS `width` and `height` properties — so without this line the file's
+   own pixel height wins over whatever the layout asked for, and a portrait photo
+   in a square slot renders thousands of pixels tall.
+
+   The trap is that `aspect-ratio` does NOT save you: it is ignored the moment
+   both axes are definite, so a slot styled `width: 100%; aspect-ratio: 1/1` is
+   silently overruled by `height="2400"`. This has already happened once, to the
+   hero.
+
+   Deliberately `img` only, not the `img, svg` rule above: the inline logo in
+   partials/header.html sizes from its width/height attributes, and it has no
+   reason to be dragged into this. */
+img { height: auto; }
+
 a { color: var(--color-primary); }
 a:hover { color: var(--color-primary-dark); }
 
