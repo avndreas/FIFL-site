@@ -4,8 +4,11 @@
 > and performance approach of the FIFL website. Read this first before making changes.
 > Keep it up to date as the site grows.
 
-Last updated: 2026-07-29 · Status: **Skeleton / v0**, live on a password-protected
-preview URL (see § 9)
+Last updated: 2026-07-31 · Status: **Skeleton / v0**, live on a password-protected
+preview URL (see § 9), with click-to-edit mode for the client (see § 11)
+
+**In a hurry?** Every command for working on this site is in one table at the
+very bottom — § 12.
 
 ---
 
@@ -38,6 +41,11 @@ McMaster-Carr's site feels instant. We copy the ideas that matter for a small st
 | **At most one web font** | Exactly one, and it is *self-hosted* (never a Google Fonts `<link>`): **Public Sans**, 26 KB — one variable WOFF2, latin subset, upright only, `font-display: swap` so text is never invisible. Two other candidates sit in `fonts.css` unselected and cost nothing. See § Fonts. | `css/fonts.css`, `css/theme.css` |
 | **Tiny, cached CSS** | 4 small stylesheets, cached after first load, shared across every page. | `css/` |
 | **Almost no JavaScript** | Two small files: the prefetch helper (~1 KB) and the mobile menu toggle (~1 KB). The site is 100% functional with JS disabled. | `js/prefetch.js`, `js/nav.js` |
+
+There is a third JavaScript file, `js/edit.js`, and it does **not** count against
+that row. No page in this repo references it; it is spliced in at the edge by
+`deploy/_worker.js` only when a URL carries `?edit`, so an ordinary visitor never
+requests it and never learns it exists. See § 11.
 | **Sharp, flat design** | No shadows/blur/animation to repaint. Cheap for old GPUs to render. | `css/*` |
 
 #### Rule: prefetch, never prerender
@@ -547,9 +555,23 @@ deliberately rather than by default. Things to weigh at that point:
 ## 6. Contact form
 
 The form on `contact.html` is **markup only** — it does not submit anywhere yet.
-When wiring it up, options (no heavy backend needed):
-- A static-host form handler (Netlify Forms, Formspree, Basin), **or**
-- A small serverless function / email endpoint.
+
+**Wire it to the machinery § 11 already built**, rather than to a third-party
+handler. `deploy/_worker.js` has a `notify()` function and a KV store behind it;
+an enquiry is the same shape as an edit batch — a POST that must be kept and then
+announced. Reusing it means one notification path to configure, not two.
+
+Copy the ordering exactly: **store first, notify second.** An enquiry that exists
+only as an email is one delivery failure away from being lost silently, and
+nothing on screen would ever say so. KV is the record; the email is a convenience.
+
+Two things differ from the edit endpoint and must not be copied across:
+
+- **It is public.** `/api/edits` sits behind the password; the contact endpoint
+  cannot. Add it to the route table *outside* the auth branch.
+- **It therefore needs spam protection** — Turnstile is the natural fit on this
+  host and adds no dependency. The edit endpoint needs none, because the password
+  is already the filter.
 
 Email and phone are still placeholders. The address is real, and the Google Maps embed is
 live: it uses the keyless `https://www.google.com/maps?q=<address>&output=embed` form, so
@@ -620,9 +642,10 @@ FIFL-site/
 │   └── hooks/
 │       └── pre-commit    # blocks a commit if pages have drifted
 ├── deploy/               # NOT site content — Cloudflare-specific, see § 9
-│   ├── _worker.js        # the password gate; runs at the edge on every request
+│   ├── _worker.js        # password gate + client-edit inbox; runs at the edge
+│   │                     #   on every request. See § 9 and § 11.
 │   ├── robots.txt        # noindex while the site is a preview
-│   └── README.md         # deployment runbook (setup, rollback, going live)
+│   └── README.md         # runbook: setup, rollback, edit mode, going live
 ├── css/
 │   ├── fonts.css         # @font-face for the candidate fonts — no download unless used
 │   ├── theme.css         # COLOURS + design tokens — edit here to re-theme
@@ -630,7 +653,9 @@ FIFL-site/
 │   └── components.css     # hero, cards, gallery, forms, buttons, placeholders
 ├── js/
 │   ├── prefetch.js       # hover/touch prefetch + speculation rules
-│   └── nav.js            # mobile three-bar menu toggle (below 820px, see § 4)
+│   ├── nav.js            # mobile three-bar menu toggle (below 820px, see § 4)
+│   └── edit.js           # click-to-edit mode. NEVER loaded by a page in this
+│                         #   repo — injected at the edge under ?edit (§ 11)
 ├── assets/
 │   ├── logo.svg          # TEMPORARY logo mark — also inlined in the header partial
 │   └── fonts/            # self-hosted variable WOFF2, one per candidate font
@@ -649,26 +674,9 @@ it will 404 on the live site while working perfectly under `npm run serve`.
 
 ### Every command, in one place
 
-There are **no npm dependencies** — `npm` is a task runner and nothing else, so every
-one of these is equally `node tools/<script>.js`. Requires Node (any recent version).
-
-| Command | What it does |
-|---|---|
-| `npm run serve` | Local preview on `:8080`. Use this for day-to-day work — web fonts do not load over `file://` (§ 5), and neither does `404.html` (§ 4). Any unmatched URL serves `404.html` with a real `404` status. |
-| `npm run sync` | Rewrites every page's header/footer from `partials/`. Run after editing a partial (§ 4). |
-| `npm run check` | Both checks below. Writes nothing; non-zero exit on failure. Run by the pre-commit hook *and* by `npm run deploy`. |
-| `npm run check:partials` | Fails if any page has drifted from `partials/`. |
-| `npm run check:colours` | Fails if a colour literal appears outside `theme.css` (§ 5). |
-| `npm run build` | Assembles `dist/`. Rarely run alone — `deploy` calls it. |
-| `npm run deploy` | check → build → upload to Cloudflare. **The only thing that changes the live site** (§ 9). |
-| `npm run postdeploy` | Runs automatically after `deploy` (npm's `post*` convention). Only prints the live URL, because wrangler prints a different one — § 9. |
-
-After a fresh `git clone`, one command is needed to arm the pre-commit hook, because
-Git never installs hooks itself:
-
-```
-git config core.hooksPath tools/hooks
-```
+**They are all in § 12**, at the end of this document — npm scripts, wrangler,
+git, and the URLs. Deliberately one table and not two: a command list that
+appears twice is a command list that disagrees with itself by next month.
 
 ---
 
@@ -772,6 +780,15 @@ Three properties of it are load-bearing:
   returns 503. A misconfiguration takes the site *down*, never *public*. Any change to
   this file must preserve that; "serve it anyway if the password isn't set" is the one
   edit that would defeat the entire arrangement.
+
+  **What "closed" means inverts at launch, and the worker already handles both
+  sides.** The `GATE_WHOLE_SITE` constant at the top of the file is `true` today,
+  so a missing secret takes the whole site down — correct, because the risk being
+  guarded against is accidental publication. Set to `false` on launch day, a
+  missing secret takes down only `/edits` and `/api/edits` and leaves the public
+  site serving — correct then, because taking a live company website offline over
+  an unset notification variable would be the bug, not the safeguard. Do not
+  collapse the two back into one blanket check.
 - **The password is never in the repo.** It is a Cloudflare secret, stored encrypted,
   injected as `env.PREVIEW_PASSWORD`. Locally it comes from `.dev.vars`, which is
   gitignored. Do not add a default password to `_worker.js` as a convenience.
@@ -781,6 +798,12 @@ Three properties of it are load-bearing:
 It is the site's only server-side code, and the only file in the project written as an
 ES module against the browser `fetch` API rather than as a CommonJS Node script — it
 runs on Cloudflare's runtime, not on Node.
+
+**It is no longer only a gate.** The same file now carries click-to-edit mode —
+the `?edit` script injection, the `/api/edits` endpoint, the `/edits` review page,
+and the `notify()` seam the contact form will share (§ 6). That is why it survives
+launch instead of being deleted; the full consequences are in § 11 and in the
+*Going live* checklist in [`deploy/README.md`](deploy/README.md).
 
 ### One behaviour that differs from `npm run serve`
 
@@ -832,11 +855,33 @@ would silently turn every 404 back into a 200.
 - Real copy and photography for the four **Services** bands (structure is in place; text is lorem).
 - Wire up the contact form to a handler.
 - Real email address and phone number on **Contact** (the address and map are done).
-- **When going public:** delete `deploy/_worker.js` **and** `deploy/robots.txt`, and drop
-  the `_worker.js` guard at the top of `tools/build.js`. Both files, not one — a
-  surviving `robots.txt` would keep the finished site out of Google indefinitely, and
-  it is the failure mode nobody notices for months. Checklist in
-  [`deploy/README.md`](deploy/README.md).
+- **When going public:** set `GATE_WHOLE_SITE = false` in `deploy/_worker.js` and delete
+  `deploy/robots.txt`. A surviving `robots.txt` would keep the finished site out of
+  Google indefinitely, and it is the failure mode nobody notices for months. Full
+  checklist in [`deploy/README.md`](deploy/README.md).
+
+  > **This item used to read "delete `deploy/_worker.js`", and that is now wrong.**
+  > The worker carries edit mode as well as the gate (§ 9, § 11), and edit mode has
+  > to keep working — and stay private — after launch. The `_worker.js` guard in
+  > `tools/build.js` stays for the same reason, but its failure message needs
+  > rewording: it says "refusing to build an unprotected site", which stops being
+  > true the day the site is meant to be public.
+
+- **Gallery bulk drop.** Photos work one slot at a time (§ 11). The gallery is nine
+  near-identical tiles where position barely matters, and dropping twenty photos one
+  at a time is the wrong shape for it — that wants a single drop zone, not nine
+  targets. Not built.
+- **Client logos in the strip.** A different problem from photography: transparent
+  PNG/SVG, sized for logos, and currently plain text (§ 3). Later, or never.
+- **Decide `<img>` vs CSS background per slot, and write the first one.** There are
+  still no `<img>` elements on this site. Recommendation stands from § 5: `<img>` for
+  anything that is content, CSS background only for the four expertise cards where
+  text sits on top — because a background cannot be lazy-loaded. The hero also wants
+  `object-fit: cover` with the `object-position` the client sends, so one file serves
+  both its 1:1 and 16:9 crops.
+- **Turn the notification on.** `notify()` is written and inert until FIFL's domain is
+  onboarded to Cloudflare Email Sending, which cannot be done from a `pages.dev`
+  address. Four environment values and no code change — see `deploy/README.md`.
 - Content-hashed asset filenames, **paired with** the long-lived `_headers` cache rules
   sketched in § 2. One job: the headers are only safe once the filenames change with
   their contents. Neither half alone is an improvement.
@@ -846,3 +891,320 @@ would silently turn every 404 back into a 200.
   duplicated — repeated card markup, or ~10+ pages with per-page `<title>`/meta to manage.
   The `partials/` files carry over unchanged, so this is not a rewrite.
 - Additional pages as requested by the client.
+
+---
+
+## 11. Click-to-edit mode
+
+The client edits his own copy by clicking the words on the real page, and adds his
+own photos by dropping them on a picture box. He gets one link, uses the password
+he already has, installs nothing, and learns nothing.
+
+```
+https://fifl-site.pages.dev/?edit      him — edit the site
+https://fifl-site.pages.dev/edits      you — read what he sent
+```
+
+**Everything he does is a proposal.** No file in this repo is written by any of
+it, and there is deliberately no command that merges one. You read `/edits`, make
+the changes by hand, and `npm run deploy` as usual. That is not a missing feature;
+it is the point. It also means he cannot break anything, which is what makes it
+safe to hand to someone non-technical without supervision.
+
+### The pieces
+
+| | |
+|---|---|
+| [`js/edit.js`](js/edit.js) | The editor. Never referenced by any page — injected at the edge. |
+| [`deploy/_worker.js`](deploy/_worker.js) | Injects it under `?edit`; receives `/api/edits` and `/api/upload`; serves `/api/photo`; renders `/edits`; holds `notify()`. |
+| KV namespace `EDITS` | Where a sent batch lands. |
+| R2 bucket `UPLOADS` | Where a photo lands. |
+
+Both bindings are added in the Cloudflare dashboard — see `deploy/README.md`. A
+missing binding degrades that half of edit mode and **never touches the site**.
+
+```
+typing        ->  localStorage, on HIS machine only
+a photo       ->  R2 immediately, metadata to localStorage
+"Send"        ->  POST /api/edits  ->  KV  ->  /edits  ->  you, by hand  ->  deploy
+```
+
+Text never leaves his browser until he presses Send. A **photo does** — it uploads
+the moment he picks it, because a half-megabyte image cannot live in localStorage
+and because failing while he is looking at the photo is far kinder than failing in
+a batch ten minutes later. What Send transmits for a photo is only its metadata.
+
+Nothing reaches a file in this repo, ever.
+
+### The one design rule: no annotations in the markup
+
+There is no `data-edit="hero.subheader"` scheme, and **adding one later would be a
+regression.** Editable elements are found by walking the DOM at load.
+
+This site's layout is expected to change often, and a keyed scheme makes every
+restructure a two-part job — move the markup, carry the keys — where forgetting
+the second half silently makes an element uneditable with nothing on screen to say
+so. Runtime discovery has no such failure mode: rewrite a page from scratch and the
+editor follows it on the next load; add a paragraph and it is editable the moment it
+exists.
+
+**This is only affordable because edits are applied by hand.** Nothing has to
+survive a machine merge, so nothing needs a stable machine-readable id. The
+previous text is the handle, and a human can find that however the markup around it
+has moved. The two decisions hold each other up — automating the apply step would
+drag the annotations back in with it.
+
+### What is editable
+
+Everything inside `<main>` that is a **text-bearing leaf**: `h1`–`h6`, `p`, `li`,
+`figcaption`, `blockquote`, `dt`, `dd`, `td`, `th`. Three exclusions, each on purpose:
+
+- **Anything outside `<main>`** — which excludes the header and footer for free. They
+  are generated from `partials/` and overwritten by the next `npm run sync` (§ 4), so
+  an edit made there could not be held.
+- **Elements containing markup other than `<br>`.** A paragraph with a link inside is
+  skipped rather than offered and then flattened on save. That trades some coverage
+  for the guarantee that editing can never destroy markup. It costs nothing today —
+  every piece of copy inside `<main>` is currently a plain-text leaf. If that changes
+  and something important stops being editable, widen `isEditable()` deliberately;
+  **do not reach for `innerHTML`.**
+- **`<div>` and `<a>`.** A div is a layout box — every `.placeholder` on the site is
+  one — and link text is usually design rather than content. All links inside `<main>`
+  are also click-suppressed while editing, because the expertise cards wrap their own
+  editable heading and paragraph and a click meant to place a cursor would otherwise
+  navigate away mid-sentence. The header nav still works and is how he moves around.
+
+`<br>` survives a round trip as a newline, so the hero title's deliberate line break
+is his to control with the Enter key rather than something the editor silently eats.
+
+### Photos
+
+A **slot** is any `<img>` or any `.placeholder` inside `<main>`. `.placeholder` is
+the site's own convention for "a picture goes here" (§ 5), which is why targeting
+it needs no annotation and survives a restyle. He clicks a slot to open the
+ordinary file dialog, or drags a file onto it — the click matters, because
+drag-and-drop is not obvious to everyone and is impossible on a tablet.
+
+#### The crop is never baked
+
+**The full frame is uploaded and his framing travels as a number.** He drags
+inside a filled slot to slide the photo around; that produces an
+`object-position` percentage pair and nothing else. No crop tool, no zoom, no
+destroyed pixels.
+
+This is worth protecting. On the real site the crop is going to be CSS anyway —
+`object-fit: cover` plus `object-position` is what makes one file serve the hero's
+1:1 desktop and 16:9 mobile ratios (§ 5). So storing his intent as a value rather
+than as a cropped file means:
+
+- you keep every pixel and can re-crop for a layout that does not exist yet;
+- changing the hero to 3:2 next month needs no re-upload and no asking him again;
+- he judges what the photo is *of*, and you judge what the slot needs — neither
+  of you does the other's job.
+
+#### What happens to the file
+
+Decoded, downscaled to a 2400px longest edge, re-encoded to WebP, uploaded. The
+re-encode is doing three useful things beyond shrinking a 5–12 MB camera original
+to ~500 KB: it strips EXIF (phone photos carry GPS, and publishing the shop
+floor's coordinates is a small but real leak), it bakes in the orientation flag so
+nothing arrives sideways, and it yields the exact pixel dimensions to write into
+`width`/`height`.
+
+2400px is deliberately generous — this is a **working master, not a site asset**.
+Even cropping to a third of the frame leaves ~800px, more than any slot in a
+1120px column needs. What ships to `assets/` is what *you* produce from it.
+
+#### He is asked what the photo is
+
+Once, in the toolbar, right after it uploads. He is the only person who knows the
+thing in the picture is a stainless auger conveyor for a bread line, and that
+answer becomes the `alt` text. Asking at the one moment anyone knows the answer
+beats inventing it later.
+
+#### HEIC
+
+Browsers cannot decode it, so an iPhone set to *High Efficiency* defeats the
+resize. When decoding fails the **original uploads untouched** and is flagged on
+`/edits` as needing conversion. He is never blocked by a file format and you are
+never surprised by a missing photo. Converting server-side would need either
+Cloudflare Images (paid) or a WASM decoder (a dependency); neither fits.
+
+#### One accepted cost
+
+A photo he uploads and then discards leaves an orphan object in R2. That is the
+price of uploading on drop rather than on Send. It is invisible — only photos
+named by a submitted batch are ever shown at `/edits` — and it is a few hundred
+KB against a 10 GB free tier.
+
+### What a batch looks like to you
+
+**The review page's job is to be pasteable, not to be a merge tool.** *Copy all as
+text* produces one block covering both kinds of change, so a photo arrives as an
+instruction rather than as a mystery file:
+
+```
+[Hero]  div.placeholder.placeholder--square.hero__image
+  PHOTO:        index-hero-image-0731.webp   (2400 × 1600)
+  POSITION:     50% 32%
+  DESCRIPTION:  Stainless auger conveyor for a bread line
+```
+
+Everything needed to write the `<img>` without opening the file — the name it
+downloads under, the dimensions for `width`/`height`, the `object-position` you
+would otherwise have had to guess, and his own words for the `alt`. The image
+files come down separately via *Download all photos*, named to match.
+
+Operational detail — the order to do things in, and the two traps when pasting
+copy back — is in [`deploy/README.md`](deploy/README.md), next to the rest of the
+runbook.
+
+### Reconciliation — how it survives you changing the site
+
+On every page load, each stored edit is checked against the page as it now is:
+
+| Live text is… | What happens |
+|---|---|
+| the **new** text | You applied it. The record is deleted. His browser tidies itself. |
+| the **old** text | Not applied yet. His override is re-drawn so his work still shows. |
+| **neither** | The source moved on underneath him. Kept, **not applied**, and counted in the toolbar as "no longer matches the page". |
+
+The third row is the honest answer to "the layout changed". His proposal is neither
+silently discarded nor silently pasted over your newer copy — it is set aside and
+reported. Elements are re-found by CSS selector first and by previous text second, so
+an edit stays attached through a restructure that a selector alone would not survive.
+
+**Photos follow the same three cases, keyed on the slot rather than the text.** If
+the slot is gone and the batch was already sent, you almost certainly replaced the
+`.placeholder` with a real `<img>` — so the record is dropped. If the slot is gone
+and it was *not* sent, that is a layout change and the record is kept and reported.
+Either way the file itself is safe in R2; this only decides what his browser keeps
+showing him.
+
+### Deliberate behaviours worth knowing
+
+- **His overrides are kept after Send, not cleared.** Wiping them would snap every
+  paragraph back to the old copy the instant he pressed the button, which reads as
+  "it did not work". They clear themselves via the table above.
+- **A slot is painted from the server copy, never from a `blob:` URL.** A blob URL
+  dies on reload and these records are persisted, so using one would leave every
+  slot blank the next time he opened the page. It also means a slot only ever
+  shows a photo the server really has.
+- **The toolbar lives in a shadow root.** The site is restyled often and a rule in
+  `base.css` for `button` or `p` must never be able to reshape the one control he
+  needs to press. Nothing leaks the other way either.
+- **Paste is plain-text.** `contenteditable="plaintext-only"` where supported, with a
+  paste handler as fallback, so a paste out of Word cannot smuggle in inline styles.
+- **Emptying a block is undone.** An empty `<p>` is not a proposal anyone can act on,
+  and it is almost always a slip.
+- **The editor's colours are deliberately not the site's** — the bar and the outlines
+  have to look foreign so an editing session is never mistaken for the finished page.
+  `js/edit.js` is therefore listed in `EXEMPT_FILES` in `tools/check-colours.js`, with
+  the reasoning at that constant. Pointing them at `--color-accent` would be a real
+  regression, not a tidy-up.
+
+### Testing it
+
+Only through the worker — `npm run serve` knows nothing about edit mode, and that is
+deliberate (a second injection implementation is exactly the serve-versus-Cloudflare
+divergence § 9 warns about). Commands in § 12.
+
+Worth checking after a layout change: open `?edit`, confirm the new or moved copy has
+a dashed outline, and confirm the header and footer do **not**.
+
+---
+
+## 12. Command reference
+
+Everything needed to work on this site, in one place. There are **no npm
+dependencies** — `npm` is a task runner and nothing else, so every `npm run x` is
+equally `node tools/x.js`. Requires Node (any recent version).
+
+### Every day
+
+| Command | What it does |
+|---|---|
+| `npm run serve` | Local preview on `:8080`. The day-to-day tool. Web fonts do not load over `file://` (§ 5), and neither does `404.html` (§ 4). Any unmatched URL serves `404.html` with a real `404`. |
+| `npm run serve -- 3000` | Same, on another port. |
+| `npm run sync` | Rewrites every page's header/footer from `partials/`. Run after editing a partial (§ 4). |
+| `npm run deploy` | check → build → upload. **The only thing that changes the live site** (§ 9). |
+
+### Checks — all write nothing, all exit non-zero on failure
+
+| Command | What it does |
+|---|---|
+| `npm run check` | Both of the below. Run by the pre-commit hook *and* by `npm run deploy`. |
+| `npm run check:partials` | Fails if any page has drifted from `partials/` (§ 4). |
+| `npm run check:colours` | Fails if a colour literal appears outside `theme.css` (§ 5). |
+
+### Build & deploy
+
+| Command | What it does |
+|---|---|
+| `npm run build` | Assembles `dist/`. Rarely run alone — `deploy` calls it. |
+| `npm run deploy` | The whole pipeline. Uploads your **working tree**, not the last commit. |
+| `npm run postdeploy` | Automatic after `deploy`. Prints the live URL, because wrangler prints a different one (§ 9). |
+| `npx wrangler@4.115.0 pages deployment list --project-name=fifl-site` | Which deploy is actually live. The `Environment` column is the authority, not the terminal. |
+
+### One-time setup
+
+After a fresh `git clone`, one command — Git never installs hooks itself:
+
+```
+git config core.hooksPath tools/hooks
+```
+
+Everything else is per-Cloudflare-account, and the full runbook with explanations is
+[`deploy/README.md`](deploy/README.md):
+
+| Command | What it does |
+|---|---|
+| `npx wrangler@4.115.0 login` | Authorise wrangler in a browser. |
+| `npx wrangler@4.115.0 pages project create fifl-site --production-branch=master` | Create the Pages project. |
+| `npx wrangler@4.115.0 pages secret put PREVIEW_PASSWORD --project-name=fifl-site` | Set the preview password. Repeat to change it. |
+| `npx wrangler@4.115.0 kv namespace create fifl-edits` | Create the store for client edits. Then bind it as **`EDITS`** in the dashboard. |
+| `npx wrangler@4.115.0 r2 bucket create fifl-uploads` | Create the store for client photos. Then bind it as **`UPLOADS`** in the dashboard. |
+
+> **Keep the version pinned exactly.** `wrangler@4` is a semver range, which npm
+> cannot resolve without a network round trip on every single invocation (§ 9). To
+> upgrade, change the number in `package.json` **and** in `deploy/README.md`.
+
+### Testing the worker locally
+
+`npm run serve` does not run the worker, so it cannot show you the password gate,
+the 404 status, or edit mode. For those:
+
+```
+echo PREVIEW_PASSWORD=whatever > .dev.vars     # gitignored; delete when done
+npm run build
+npx wrangler@4.115.0 pages dev dist --kv EDITS --r2 UPLOADS --compatibility-date=2026-07-29
+```
+
+`--kv EDITS` and `--r2 UPLOADS` give you throwaway local stores under
+`.wrangler/` — nothing touches Cloudflare. Then visit `http://localhost:8788/`
+plus `?edit`, and `/edits`.
+
+**If a restart seems to change nothing, look for an orphaned `workerd`.** Ctrl+C
+does not always take wrangler's runtime down with it, and the survivor keeps the
+port — so the *old* worker answers while the terminal says the new one is ready.
+That looks exactly like your edit having no effect. `deploy/README.md` has the
+command to find and kill the tree.
+
+**`--compatibility-date` is required, and the error without it is misleading.**
+Wrangler defaults it to *today*, but the workerd runtime inside the pinned
+`wrangler@4.115.0` only understands dates up to **2026-07-29**, so it refuses to
+boot with *"This Worker requires compatibility date … but the newest date
+supported by this server binary is …"* — which reads like a broken install and is
+not one. Local dev only; the deployed site takes its date from the Pages project.
+It disappears when wrangler is upgraded (§ 9).
+
+### URLs
+
+| URL | Who | What |
+|---|---|---|
+| `fifl-site.pages.dev` | you, the client | The live preview. Always the newest production deploy. |
+| `fifl-site.pages.dev/?edit` | **the client** | Edit mode. Give him this one as a desktop shortcut (§ 11). |
+| `fifl-site.pages.dev/edits` | **you** | What he has sent. Same password. |
+| `<hash>.fifl-site.pages.dev` | you | Immutable snapshot of one deploy. What makes rollback possible (§ 9). |
+| `localhost:8080` | you | `npm run serve`. |
+| `localhost:8788` | you | `wrangler pages dev`. |

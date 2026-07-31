@@ -25,6 +25,12 @@
                           resolve, so it must carry baked-in colours. Artwork
                           that IS page chrome should be inlined into a partial
                           instead — see the logo in partials/header.html.
+       deploy/          — not site content. _worker.js runs at Cloudflare's edge
+                          and renders one page of its own (the /edits review
+                          page), which is a private tool rather than part of the
+                          site and is bound by none of its design rules. Listed
+                          here so the omission is a decision, not an oversight.
+       js/edit.js       — see EXEMPT_FILES below.
 
    Escape hatch: put `theme-exempt` in a comment on the offending line.
    ========================================================================== */
@@ -48,6 +54,21 @@ const NAMED = [
   "gold", "tan", "salmon", "coral", "crimson", "indigo", "violet", "turquoise",
   "darkgreen", "lightgreen", "seagreen", "forestgreen", "whitesmoke",
 ];
+
+/**
+ * Files inside a scanned directory that are tooling rather than site content.
+ *
+ * js/edit.js paints the client-facing edit toolbar (SITE-SPEC § 11). Its
+ * colours are deliberately NOT the site's: the bar and the outlines around
+ * editable text have to look foreign to this design, so that nobody can mistake
+ * an editing session for the finished page. Pointing them at --color-accent
+ * would be an actual regression, and it never ships to a visitor — the file is
+ * injected by deploy/_worker.js only when a page is requested with ?edit.
+ *
+ * Prefer `theme-exempt` on a line for one-off cases. A whole-file entry here is
+ * for files where every colour is exempt for the same reason.
+ */
+const EXEMPT_FILES = new Set([path.join("js", "edit.js")]);
 
 const RE_HEX = /#[0-9a-fA-F]{3,8}\b/g;
 const RE_FUNC = /\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\s*\(/g;
@@ -176,7 +197,7 @@ const targets = [
   ...listFiles(".", ".html").map((f) => ({ file: f, scan: scanHtml })),
   ...listFiles("partials", ".html").map((f) => ({ file: f, scan: scanHtml })),
   ...listFiles("js", ".js").map((f) => ({ file: f, scan: scanJs })),
-];
+].filter((t) => !EXEMPT_FILES.has(t.file));
 
 if (!fs.existsSync(path.join(ROOT, TOKEN_FILE))) {
   console.error("ERROR: missing " + TOKEN_FILE);
